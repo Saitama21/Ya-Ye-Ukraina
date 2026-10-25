@@ -1,6 +1,6 @@
 # Я Є. Україна 🇺🇦
 
-**Dark Ukraine Hybrid — nationwide map prototype (v0.5 — Safari-compatible streets).**
+**Dark Ukraine Hybrid — nationwide map prototype (v0.5.2 — Safari tile-rendering repair).**
 
 A responsive, self-hosted, offline-capable-after-loading static web demo of Ukraine's administrative hierarchy. No backend, payment processing or fictitious public-user counts. Street-mode resources are loaded from third-party CDNs and require internet.
 
@@ -56,3 +56,13 @@ The datasets are reduced for in-app use; their presence does not imply endorseme
 Leaflet uses a raster map rather than WebGL2 and is therefore suitable for older iPad Safari versions. The map JavaScript and map image tiles still need a network connection. The page falls back to the overview when the library CDN fails. This version was statically verified; it has not been manually tested on every Safari device.
 
 Leaflet © 2010–2023 Volodymyr Agafonkin et al, BSD 2-Clause (https://github.com/Leaflet/Leaflet). OSMF Tile Policy: https://operations.osmfoundation.org/policies/tiles/
+
+## Safari / iPad tile visibility hotfix (0.5.2)
+
+- Removed WebKit-hostile CSS filtering of Leaflet's entire tile pane and dropped its isolated stacking context.
+- Scoped overview-only SVG rules so they cannot distort Leaflet's own geographical SVG overlays.
+- Added resize reconciliation when a previously hidden map is displayed, on split-view resizing and when the iPad returns to the page.
+- Limited tile-buffer requests and disabled GPU zoom animations on touch Safari while retaining animated transitions on desktop.
+- Added detection of tile-load errors/stalls and a user-triggered **Оновити плитки** button. No background bulk retries or offline tile downloads.
+
+This addresses plausible rendering/network causes of missing tiles. JavaScript syntax, DOM IDs, and GitHub assets were checked; end-to-end iPad Safari tile delivery remains to be confirmed by device testing. The community-hosted standard OpenStreetMap tile server has no SLA; for production-scale traffic, a contracted raster tile provider is required.
