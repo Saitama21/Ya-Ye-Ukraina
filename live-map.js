@@ -102,7 +102,7 @@ function addLayers(){
  map.addLayer({id:"ye-focus-line",type:"line",source:"ye-focus",paint:{"line-color":"#ffd15e","line-width":3,"line-opacity":0.96}});
  map.on("click","ye-oblast-fill",e=>{
   const name=e.features?.[0]?.properties?.name;
-  if(name&&typeof window.YE_SELECT_OBLAST==="function")window.YE_SELECT_OBLAST(name);
+  if(name&&map.getZoom()<=7.8&&typeof window.YE_SELECT_OBLAST==="function")window.YE_SELECT_OBLAST(name);
  });
  map.on("mouseenter","ye-oblast-fill",()=>{map.getCanvas().style.cursor="pointer"});
  map.on("mouseleave","ye-oblast-fill",()=>{map.getCanvas().style.cursor=""});
@@ -112,6 +112,7 @@ async function init(){
  starting=(async()=>{
   try{
    tell("Підключаємо карту з вулицями…");
+   if(!document.getElementById("ye-maplibre-css")){const css=document.createElement("link");css.id="ye-maplibre-css";css.rel="stylesheet";css.href="https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.css";document.head.append(css)}
    const gl=await import("https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.mjs");
    if(!gl.supported()){throw Error("WebGL2 unavailable")}
    map=new gl.Map({container:box,style:STYLE,center:[31.2,48.7],zoom:5,attributionControl:true,cooperativeGestures:true,renderWorldCopies:false,maxZoom:19,minZoom:3,fadeDuration:200,locale:{"AttributionControl.ToggleAttribution":"Джерела карти"}});
