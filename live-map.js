@@ -74,21 +74,34 @@ async function selectNow(sel){
  if(sel.kind==="oblast"){focusBounds(rg);tell(sel.oblast.name+" область · живі вулиці");return}
  const id=sel.kind==="raion"?sel.raion?.id:sel.community?.id;
  const type=sel.kind==="raion"?"district":"community";
- const known=!!files?.[type]?.[id];
- if(!known){focusBounds(rg);tell("Точний контур "+(sel.kind==="raion"?"району":"громади")+" ще не доступний; показано область");return}
- tell("Завантажуємо межі "+(sel.kind==="raion"?"району":"громади")+"…");
+ // A missing community polygon never sends users to a made-up location.
+ // Fall back to the real parent district geometry, if available.
+ const hasExact=!!files?.[type]?.[id];
+ const fallbackId=sel.kind==="community"?sel.raion?.id:null;
+ const hasParent=!!files?.district?.[fallbackId];
+ if(!hasExact&&!hasParent){
+  focusBounds(rg);
+  tell("Точні межі території відсутні. Показано область; вулиці можна наблизити вручну.");
+  return;
+ }
+ tell("Завантажуємо межі території…");
  try{
-  const feature=await loadBoundary(id,type,abortController.signal);
+  let feature=hasExact?await loadBoundary(id,type,abortController.signal):null;
+  let usedParent=false;
+  if(token!==requestId)return;
+  if(!feature&&hasParent){
+   feature=await loadBoundary(fallbackId,"district",abortController.signal);
+   usedParent=true;
+  }
   if(token!==requestId)return;
   const b=feature?getBounds(feature):null;
-  if(!b){focusBounds(rg);tell("Геометрія території відсутня; показано область");return}
-  if(!map.getSource("ye-focus"))return;
-  map.getSource("ye-focus").setData(feature);
+  if(!b){focusBounds(rg);tell("Геометрія території недоступна; показано область.");return}
+  map.getSource("ye-focus")?.setData(feature);
   focusBounds(b);
-  tell((sel.kind==="raion"?"Район":"Громада")+" · точний контур з OpenStreetMap · доступні вулиці");
+  tell(usedParent?"Точні межі громади відсутні — показано її район. Можна наближати вулиці.":(sel.kind==="raion"?"Район":"Громада")+" · межі з OpenStreetMap · дороги та вулиці");
  }catch(err){
   if(token!==requestId||err.name==="AbortError")return;
-  focusBounds(rg);tell("Не вдалося завантажити детальну межу; показано область");
+  focusBounds(rg);tell("Не вдалося завантажити детальну межу — показано область.");
  }
 }
 function addLayers(){
@@ -119,7 +132,7 @@ async function init(){
    await new Promise((resolve,reject)=>{
     const timeout=setTimeout(()=>reject(new Error("Map load timeout")),22000);
     map.once("load",()=>{clearTimeout(timeout);resolve()});
-    map.once("error",e=>{if(!map.loaded()){clearTimeout(timeout);reject(e.error||new Error("Basemap error"))}});
+    map.on("error",e=>console.warn("Tile/style resource warning:",e.error?.message||e.error));
    });
    addLayers();
    return map;
