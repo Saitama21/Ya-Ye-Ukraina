@@ -27,6 +27,7 @@
 <div class="map-toolbar"><div><h2 id="map-selection">Вся Україна</h2><small id="map-status">Клікни область або позначку міста</small></div><div class="map-mode" role="group" aria-label="Режим карти"><button id="mode-overview" type="button" class="active" aria-pressed="true">◈ Огляд</button><button id="mode-streets" type="button" aria-pressed="false">⌖ Вулиці</button></div></div>
 <div class="map-wrap" id="map-wrap">
 <div id="street-map" class="street-map" aria-label="Жива карта вулиць України" hidden></div>
+<button id="retry-tiles" class="tile-retry" type="button" hidden aria-label="Повторити завантаження плиток карти">↻ Оновити плитки</button>
 <svg id="ukraine-map" viewBox="0 0 900 600" role="group" aria-label="Мапа України. Клікніть область для вибору" preserveAspectRatio="xMidYMid meet">
 <defs><pattern id="mesh" width="21" height="21" patternUnits="userSpaceOnUse"><path d="M21 0H0V21" class="map-grid"/></pattern>
 <filter id="soft-glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
