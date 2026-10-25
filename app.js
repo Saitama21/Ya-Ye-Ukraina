@@ -88,7 +88,9 @@ function choose(v){
  if(selection.oblast)openedArea=selection.oblast.id;
  if(selection.raion)openedDistrict=selection.raion.id;
  breadcrumbs();mapState();renderTree();renderInfo();renderStats();
+ window.YE_LIVE_MAP?.select(selection);
 }
+window.YE_SELECT_OBLAST=(name)=>{const o=areas.find(a=>sk(a.name)===sk(name));if(o)choose({kind:"oblast",oblast:o})};
 const tree=$("#area-tree");
 function renderTree(){
  tree.replaceChildren();
@@ -191,9 +193,9 @@ document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{
  if(tab==="search"){$("#place-search").focus();tab="map"}renderTree();
 });
 $("#reset-selection").onclick=()=>{openedArea=null;openedDistrict=null;$("#place-search").value="";choose({kind:"country"})};
-$("#zoom-in").onclick=()=>zoom(view[0]+view[2]/2,view[1]+view[3]/2,view[2]*.78,view[3]*.78);
-$("#zoom-out").onclick=()=>zoom(view[0]+view[2]/2,view[1]+view[3]/2,view[2]*1.3,view[3]*1.3);
-$("#zoom-home").onclick=zoomSelection;
+$("#zoom-in").onclick=()=>{if(window.YE_LIVE_MAP?.zoomIn())return;zoom(view[0]+view[2]/2,view[1]+view[3]/2,view[2]*.78,view[3]*.78)};
+$("#zoom-out").onclick=()=>{if(window.YE_LIVE_MAP?.zoomOut())return;zoom(view[0]+view[2]/2,view[1]+view[3]/2,view[2]*1.3,view[3]*1.3)};
+$("#zoom-home").onclick=()=>{if(window.YE_LIVE_MAP?.zoomHome())return;zoomSelection()};
 function modal(open){$("#dialog-layer").classList.toggle("open",open);$("#dialog-layer").setAttribute("aria-hidden",String(!open))}
 let activeCard=null;
 function showCard(c){
