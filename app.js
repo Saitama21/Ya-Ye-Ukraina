@@ -120,6 +120,7 @@ function renderUrbanDistricts(){
  }
  tree.append(n("p","empty","Райони міста — не райони області. Для частини міст точні межі ще не перевірені, тому карта показує місто без вигаданого контуру."));
 }
+window.YE_SELECT_CITY_DISTRICT=(cityName,districtName)=>{const city=cityByName.get(cityName);if(city&&city.districts.includes(districtName))choose(urbanSelection(city,districtName))};
 window.YE_SELECT_OBLAST=(name)=>{const o=areas.find(a=>sk(a.name)===sk(name));if(o)choose({kind:"oblast",oblast:o})};
 const tree=$("#area-tree");
 function renderTree(){
