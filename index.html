@@ -4,8 +4,8 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#06172e">
 <meta name="description" content="Я Є. Україна — інтерактивна мапа областей, районів, громад та українських міст. Локальна демонстрація цифрової спільноти.">
 <title>Я Є. Україна — мапа областей, районів і громад</title>
-<link rel="stylesheet" href="leaflet.css?v=0.5.2"><link rel="stylesheet" href="styles.css?v=0.5.2">
-<script src="territories.js" defer></script><script src="boundary-index.js" defer></script><script src="app.js?v=0.5.2" defer></script><script src="live-map.js?v=0.5.3" defer></script>
+<link rel="stylesheet" href="leaflet.css?v=0.5.2"><link rel="stylesheet" href="styles.css?v=0.6.0">
+<script src="territories.js" defer></script><script src="boundary-index.js" defer></script><script src="app.js?v=0.6.0" defer></script><script src="live-map.js?v=0.6.0" defer></script><script src="pixel-map.js?v=0.6.0" defer></script>
 </head>
 <body>
 <div class="app-shell">
@@ -24,9 +24,12 @@
 <div class="geo-note">Дані справочника: області, райони та громади. Жива карта показує реальні дороги й вулиці. Доступні межі районів і громад підвантажуються при виборі; для решти показуємо межу області.</div>
 </aside>
 <div class="glass map-panel">
-<div class="map-toolbar"><div><h2 id="map-selection">Вся Україна</h2><small id="map-status">Клікни область або позначку міста</small></div><div class="map-mode" role="group" aria-label="Режим карти"><button id="mode-overview" type="button" class="active" aria-pressed="true">◈ Огляд</button><button id="mode-streets" type="button" aria-pressed="false">⌖ Вулиці</button></div></div>
+<div class="map-toolbar"><div><h2 id="map-selection">Вся Україна</h2><small id="map-status">Клікни область або позначку міста</small></div><div class="map-mode" role="group" aria-label="Режим карти"><button id="mode-overview" type="button" class="active" aria-pressed="true">◈ Огляд</button><button id="mode-streets" type="button" aria-pressed="false">⌖ Вулиці</button><button id="mode-pixels" type="button" class="active" aria-pressed="true">▦ Пікселі</button></div></div>
 <div class="map-wrap" id="map-wrap">
 <div id="street-map" class="street-map" aria-label="Жива карта вулиць України" hidden></div>
+<canvas id="pixel-canvas" class="pixel-overlay" aria-label="Піксельна сітка особистих місць" hidden></canvas>
+<div id="pixel-banner" class="pixel-banner" role="status" hidden><div><b>✦ Обери свій піксель</b><p id="pixel-instruction">Наблизь мапу і торкнись клітинки</p></div><button id="pixel-cancel" type="button">Скасувати</button></div>
+<div id="pixel-preview" class="pixel-preview" hidden><span class="pixel-icon">▦</span><div><strong id="pixel-preview-name"></strong><small id="pixel-preview-id"></small></div><button id="pixel-preview-open" type="button">Картка ↗</button></div>
 <button id="retry-tiles" class="tile-retry" type="button" hidden aria-label="Повторити завантаження плиток карти">↻ Оновити плитки</button>
 <svg id="ukraine-map" viewBox="0 0 900 600" role="group" aria-label="Мапа України. Клікніть область для вибору" preserveAspectRatio="xMidYMid meet">
 <defs><pattern id="mesh" width="21" height="21" patternUnits="userSpaceOnUse"><path d="M21 0H0V21" class="map-grid"/></pattern>
@@ -50,11 +53,11 @@
 <div class="kpi"><div class="kpi-label">★ Мої локальні демокартки</div><strong class="gold" id="kpi-cards">0</strong><small><span id="kpi-city">—</span> орієнтирів великих міст</small></div>
 </div></section>
 <section id="story" class="intro" style="padding:70px 6px 20px"><div><div class="kicker">ДЕ Б ТИ НЕ БУВ</div><h1>Ти — частина <b>України.</b></h1><p>Ми створюємо цифровий простір, де кожна людина може залишити свою історію.</p></div></section>
-<footer id="about">© Я Є. Україна · Демонстрація без оплати та публічної реєстрації.<br>Адміністративні назви: Open Admin Data (CC BY 4.0) · Геометрія: OpenStreetMap contributors через darmat1/ukraine-geo-data (ODbL). Мапа вулиць: OpenFreeMap / OpenMapTiles / © OpenStreetMap. Для вулиць потрібен інтернет. Позначки великих міст — орієнтовні. Деякі адміністративні записи можуть відрізнятися від поточного офіційного кодифікатора.</footer>
+<footer id="about">© Я Є. Україна · Демонстрація без оплати та публічної реєстрації.<br>Адміністративні назви: Open Admin Data (CC BY 4.0) · Геометрія: OpenStreetMap contributors через darmat1/ukraine-geo-data (ODbL). Мапа вулиць: © OpenStreetMap contributors. Для вулиць потрібен інтернет. Позначки великих міст — орієнтовні. Деякі адміністративні записи можуть відрізнятися від поточного офіційного кодифікатора.</footer>
 </div>
 <nav class="mobile-dock" aria-label="Мобільна навігація"><a href="#home"><span>⌂</span>Головна</a><a href="#map"><span>▦</span>Мапа</a><a href="#story"><span>♡</span>Історія</a></nav>
 <div class="dialog-backdrop" id="dialog-layer" aria-hidden="true"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="dialog-head"><h2 id="modal-title">Демокартка</h2><button type="button" class="dialog-close" id="close-dialog" aria-label="Закрити">×</button></div>
-<form id="card-form"><p class="info-copy">Місце: <strong id="dialog-place">Україна</strong><br>Безкоштовна локальна демонстрація. Жодного платежу.</p><label for="card-name">Ім'я або нікнейм</label><input id="card-name" required maxlength="45" placeholder="Як тебе звати?"><label for="card-message">Твоє послання</label><textarea id="card-message" maxlength="140" rows="4" placeholder="Де б я не був — я частина України…"></textarea><button class="cta" type="submit">Зберегти на пристрої ↗</button></form>
-<div id="card-view" hidden><div class="success"><strong id="view-name"></strong><div id="view-number"></div><div id="view-place"></div><div id="view-message"></div></div><p class="info-copy">Картка є тільки у твоєму браузері. Друзі зможуть побачити лише текст, яким ти поділишся.</p><button class="cta" id="share-card" type="button">Поділитися текстом</button><button class="dialog-close" id="delete-card" type="button" style="width:auto;padding:5px 10px;margin-top:14px;font-size:12px">Видалити картку</button></div>
+<form id="card-form"><p class="info-copy">Місце: <strong id="dialog-place">Україна</strong><br>Безкоштовна локальна демонстрація. Жодного платежу.</p><div id="pixel-choice-info" class="pixel-choice-info">▦ Місце обрано на мапі</div><label for="card-name">Ім'я або нікнейм</label><input id="card-name" required maxlength="45" placeholder="Як тебе звати?"><label for="card-message">Твоє послання</label><textarea id="card-message" maxlength="140" rows="4" placeholder="Де б я не був — я частина України…"></textarea><button class="cta" type="submit">Зберегти на пристрої ↗</button></form>
+<div id="card-view" hidden><div class="success"><strong id="view-name"></strong><div id="view-number"></div><div id="view-place"></div><div id="view-message"></div><div id="view-pixel-meta" class="pixel-card-meta"></div></div><p class="info-copy">Картка є тільки у твоєму браузері. Друзі зможуть побачити лише текст, яким ти поділишся.</p><button class="cta" id="view-map" type="button">▦ Показати на мапі</button><button class="cta secondary-cta" id="share-card" type="button">Поділитися текстом</button><button class="dialog-close" id="delete-card" type="button" style="width:auto;padding:5px 10px;margin-top:14px;font-size:12px">Видалити картку</button></div>
 </div></div>
 </body></html>
