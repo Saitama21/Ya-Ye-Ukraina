@@ -125,7 +125,6 @@ async function init(){
  starting=(async()=>{
   try{
    tell("Підключаємо карту з вулицями…");
-   if(!document.getElementById("ye-maplibre-css")){const css=document.createElement("link");css.id="ye-maplibre-css";css.rel="stylesheet";css.href="https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.css";document.head.append(css)}
    const gl=await import("https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.mjs");
    if(!gl.supported()){throw Error("WebGL2 unavailable")}
    map=new gl.Map({container:box,style:STYLE,center:[31.2,48.7],zoom:5,attributionControl:true,cooperativeGestures:true,renderWorldCopies:false,maxZoom:19,minZoom:3,fadeDuration:200,locale:{"AttributionControl.ToggleAttribution":"Джерела карти"}});
