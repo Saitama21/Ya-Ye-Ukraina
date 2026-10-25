@@ -1,164 +1,244 @@
-/* Live streets layer. MapLibre GL JS 6, OpenFreeMap dark style, OSM geometry overlay.
-   Falls back to local SVG overview if dynamic module or online tiles are unavailable. */
+/* Я Є. Україна — raster street map compatible with iPad Safari.
+   Leaflet 1.9.4 (BSD-2-Clause); geographic data: OpenStreetMap.
+   Offline SVG overview remains independent from this module. */
 (()=>{
 "use strict";
-const data=window.YE_DATA, files=window.YE_BOUNDARY_FILES;
-const $=s=>document.querySelector(s);
-const scope=$("#map-wrap"), box=$("#street-map"), staticMap=$("#ukraine-map");
-const overview=$("#mode-overview"), streets=$("#mode-streets"), status=$("#map-status");
-const REMOTE="https://raw.githubusercontent.com/darmat1/ukraine-geo-data/main/geodata/";
-const STYLE="https://tiles.openfreemap.org/styles/dark";
-let map=null, mode="overview", requestId=0, starting=null, current={kind:"country"}, selectedData=null, statusText=null;
-function tell(s){statusText=s;status.textContent=s;$("#map-data-hint").textContent=s}
-function updateButtons(){overview.classList.toggle("active",mode==="overview");streets.classList.toggle("active",mode==="streets");overview.setAttribute("aria-pressed",String(mode==="overview"));streets.setAttribute("aria-pressed",String(mode==="streets"))}
-function resetVisual(){mode="overview";scope.classList.remove("street-active");box.hidden=true;updateButtons()}
-function getBounds(feature){
- const lo=[180,90,-180,-90];
- const scan=a=>{if(typeof a[0]==="number"){lo[0]=Math.min(lo[0],a[0]);lo[1]=Math.min(lo[1],a[1]);lo[2]=Math.max(lo[2],a[0]);lo[3]=Math.max(lo[3],a[1])}else for(const v of a)scan(v)};
- const go=f=>{if(!f)return;if(f.type==="FeatureCollection")f.features.forEach(go);else if(f.type==="Feature")go(f.geometry);else if(f.type==="GeometryCollection")f.geometries.forEach(go);else if(f.coordinates)scan(f.coordinates)};
- go(feature);return lo.every(Number.isFinite)&&lo[0]<=lo[2]&&lo[1]<=lo[3]?[ [lo[0],lo[1]],[lo[2],lo[3]] ]:null;
+const data=window.YE_DATA,files=window.YE_BOUNDARY_FILES,$=s=>document.querySelector(s);
+const root=$("#map-wrap"),target=$("#street-map"),overview=$("#mode-overview"),streets=$("#mode-streets");
+if(!data||!files||!root||!target||!overview||!streets)return;
+const GEOBASE="https://raw.githubusercontent.com/darmat1/ukraine-geo-data/main/geodata/";
+const sources=[
+"https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js",
+"https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+];
+const cityCenters={"Київ":[50.4501,30.5234],"Севастополь":[44.6167,33.5254]};
+const norm=name=>String(name||"").toLowerCase().replace(/^автономна республіка /,"").replace(/ область$/,"");
+const regionJSON={type:"FeatureCollection",features:data.regions.map(o=>({
+ type:"Feature",properties:{name:o.name},geometry:{type:"MultiPolygon",coordinates:o.parts}
+}))};
+let map=null,regionLayer=null,highlight=null,focusLayer=null,cityLayer=null,tiles=null,
+ mode="overview",current={kind:"country"},startPromise=null,libPromise=null,
+ seq=0,boundaryAbort=null,loadedTile=false;
+const cache=new Map();
+const reducedMotion=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function message(s){$("#map-status").textContent=s;$("#map-data-hint").textContent=s}
+function toggleUI(){
+ const live=mode==="streets";
+ overview.classList.toggle("active",!live);streets.classList.toggle("active",live);
+ overview.setAttribute("aria-pressed",String(!live));
+ streets.setAttribute("aria-pressed",String(live));
+ root.classList.toggle("street-active",live);
+ target.hidden=!live;
+ window.YE_STREET_ACTIVE=live;
+ if(live&&map)requestAnimationFrame(()=>map.invalidateSize({pan:false}));
 }
-function toCollection(){
- return {type:"FeatureCollection",features:data.regions.map(o=>({type:"Feature",properties:{name:o.name},geometry:{type:"MultiPolygon",coordinates:o.parts}}))};
-}
-const regions=toCollection();
-const fullBounds=getBounds(regions),cached=new Map();
-const similar=n=>n?.toLowerCase().replace(/^автономна республіка /,"").replace(/ область$/,"")||"";
-function matchingRegion(sel){
- if(!sel.oblast)return null;
- return data.regions.find(o=>similar(o.name)===similar(sel.oblast.name))||null;
-}
-function focusBounds(bounds,full=false){
- if(!map||!bounds)return;
- map.fitBounds(bounds,{padding:full?{top:40,bottom:38,left:35,right:35}:{top:64,bottom:68,left:42,right:42},duration:window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:1050,maxZoom:full?6:14});
-}
-function borderSelection(sel){
- if(!map||!map.getLayer("ye-highlight"))return;
- let name=matchingRegion(sel)?.name||"";
- map.setFilter("ye-highlight",["==",["get","name"],name]);
-}
-function removeFine(){
- if(!map||!map.getSource("ye-focus"))return;
- map.getSource("ye-focus").setData({type:"FeatureCollection",features:[]});
-}
-function cleanGeometry(payload){
- if(!payload||payload.type!=="FeatureCollection"||!Array.isArray(payload.features))return null;
- const good=payload.features.filter(f=>f?.geometry&&["Polygon","MultiPolygon"].includes(f.geometry.type));
- return good.length?{type:"FeatureCollection",features:good.map(f=>({type:"Feature",properties:{},geometry:f.geometry}))}:null;
-}
-async function loadBoundary(id,type,signal){
- const file=files?.[type]?.[id];if(!file)return null;
- if(cached.has(file))return cached.get(file);
- const resp=await fetch(REMOTE+encodeURIComponent(file),{signal,mode:"cors"});
- if(!resp.ok)throw new Error("HTTP "+resp.status);
- const geo=cleanGeometry(await resp.json());
- if(geo)cached.set(file,geo);
- return geo;
-}
-let abortController=null;
-async function selectNow(sel){
- if(!map||!map.isStyleLoaded())return;
- const token=++requestId;
- if(abortController)abortController.abort();
- abortController=new AbortController();
- borderSelection(sel);removeFine();
- if(sel.kind==="country"){focusBounds(fullBounds,true);tell("Усі області України · наближай карту до вулиць");return}
- if(sel.kind==="city"){
-  map.flyTo({center:[sel.city.lon,sel.city.lat],zoom:13.6,duration:window.matchMedia("(prefers-reduced-motion: reduce)").matches?0:1100});
-  tell("Місто "+sel.city.name+" · вулиці та дороги");return;
- }
- const region=matchingRegion(sel);
- if(!region){tell("Для цього міста точну геометрію ще не підключено");return}
- // The oblast geometry is always available, even with no fine boundaries online.
- const rg=getBounds({type:"MultiPolygon",coordinates:region.parts});
- if(sel.kind==="oblast"){focusBounds(rg);tell(sel.oblast.name+" область · живі вулиці");return}
- const id=sel.kind==="raion"?sel.raion?.id:sel.community?.id;
- const type=sel.kind==="raion"?"district":"community";
- // A missing community polygon never sends users to a made-up location.
- // Fall back to the real parent district geometry, if available.
- const hasExact=!!files?.[type]?.[id];
- const fallbackId=sel.kind==="community"?sel.raion?.id:null;
- const hasParent=!!files?.district?.[fallbackId];
- if(!hasExact&&!hasParent){
-  focusBounds(rg);
-  tell("Точні межі території відсутні. Показано область; вулиці можна наблизити вручну.");
-  return;
- }
- tell("Завантажуємо межі території…");
- try{
-  let feature=hasExact?await loadBoundary(id,type,abortController.signal):null;
-  let usedParent=false;
-  if(token!==requestId)return;
-  if(!feature&&hasParent){
-   feature=await loadBoundary(fallbackId,"district",abortController.signal);
-   usedParent=true;
-  }
-  if(token!==requestId)return;
-  const b=feature?getBounds(feature):null;
-  if(!b){focusBounds(rg);tell("Геометрія території недоступна; показано область.");return}
-  map.getSource("ye-focus")?.setData(feature);
-  focusBounds(b);
-  tell(usedParent?"Точні межі громади відсутні — показано її район. Можна наближати вулиці.":(sel.kind==="raion"?"Район":"Громада")+" · межі з OpenStreetMap · дороги та вулиці");
- }catch(err){
-  if(token!==requestId||err.name==="AbortError")return;
-  focusBounds(rg);tell("Не вдалося завантажити детальну межу — показано область.");
- }
-}
-function addLayers(){
- if(!map||map.getSource("ye-oblasts"))return;
- map.addSource("ye-oblasts",{type:"geojson",data:regions});
- map.addLayer({id:"ye-oblast-fill",type:"fill",source:"ye-oblasts",paint:{"fill-color":"#0c67c5","fill-opacity":["interpolate",["linear"],["zoom"],4,0.07,10,0.01]}});
- map.addLayer({id:"ye-oblast-line",type:"line",source:"ye-oblasts",paint:{"line-color":"#319bfa","line-width":["interpolate",["linear"],["zoom"],4,1.5,12,0.7],"line-opacity":0.87}});
- map.addLayer({id:"ye-highlight",type:"fill",source:"ye-oblasts",filter:["==",["get","name"],""],paint:{"fill-color":"#ffcf4e","fill-opacity":0.19}});
- map.addSource("ye-focus",{type:"geojson",data:{type:"FeatureCollection",features:[]}});
- map.addLayer({id:"ye-focus-fill",type:"fill",source:"ye-focus",paint:{"fill-color":"#ffcb4a","fill-opacity":0.10}});
- map.addLayer({id:"ye-focus-line",type:"line",source:"ye-focus",paint:{"line-color":"#ffd15e","line-width":3,"line-opacity":0.96}});
- map.on("click","ye-oblast-fill",e=>{
-  const name=e.features?.[0]?.properties?.name;
-  if(name&&map.getZoom()<=7.8&&typeof window.YE_SELECT_OBLAST==="function")window.YE_SELECT_OBLAST(name);
+async function loadScript(url,timeoutMs){
+ return new Promise((resolve,reject)=>{
+  const sc=document.createElement("script");
+  sc.src=url;sc.async=true;sc.crossOrigin="anonymous";
+  const timer=setTimeout(()=>{sc.remove();reject(new Error("CDN timeout"))},timeoutMs);
+  sc.onload=()=>{clearTimeout(timer);window.L?.map?resolve():reject(new Error("Leaflet not initialized"))};
+  sc.onerror=()=>{clearTimeout(timer);sc.remove();reject(new Error("CDN unavailable"))};
+  document.head.append(sc);
  });
- map.on("mouseenter","ye-oblast-fill",()=>{map.getCanvas().style.cursor="pointer"});
- map.on("mouseleave","ye-oblast-fill",()=>{map.getCanvas().style.cursor=""});
 }
-async function init(){
- if(starting)return starting;
- starting=(async()=>{
-  try{
-   tell("Підключаємо карту з вулицями…");
-   const gl=await import("https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.mjs");
-   if(!gl.supported()){throw Error("WebGL2 unavailable")}
-   map=new gl.Map({container:box,style:STYLE,center:[31.2,48.7],zoom:5,attributionControl:true,cooperativeGestures:true,renderWorldCopies:false,maxZoom:19,minZoom:3,fadeDuration:200,locale:{"AttributionControl.ToggleAttribution":"Джерела карти"}});
-   await new Promise((resolve,reject)=>{
-    const timeout=setTimeout(()=>reject(new Error("Map load timeout")),22000);
-    map.once("load",()=>{clearTimeout(timeout);resolve()});
-    map.on("error",e=>console.warn("Tile/style resource warning:",e.error?.message||e.error));
-   });
-   addLayers();
-   return map;
-  }catch(e){console.warn("Live map unavailable; SVG fallback active",e);if(map){try{map.remove()}catch(_){}map=null}
-    throw e;
+async function library(){
+ if(window.L?.map)return window.L;
+ if(!libPromise)libPromise=(async()=>{
+  const errors=[];
+  for(const url of sources){
+   try{await loadScript(url,14000);return window.L}catch(e){errors.push(e.message)}
   }
+  throw Error(errors.join("; "));
  })();
- try{return await starting}catch(e){starting=null;throw e}
+ try{return await libPromise}catch(e){libPromise=null;throw e}
 }
-async function activate(sel,auto=false){
- current=sel||current;mode="streets";box.hidden=false;scope.classList.add("street-active");updateButtons();
+function pickRegion(s){
+ return s.oblast?data.regions.find(o=>norm(o.name)===norm(s.oblast.name)):null;
+}
+function boundsOf(obj){
+ if(!obj)return null;
+ try{const bounds=window.L.geoJSON(obj).getBounds();return bounds.isValid()?bounds:null}catch(e){return null}
+}
+function flyBounds(b,z){
+ if(!b||!map)return false;
+ const pad=root.clientWidth<580?[25,25]:[50,50];
+ const opts={padding:pad,maxZoom:z||14,animate:!reducedMotion(),duration:.95};
+ map.flyToBounds(b,opts);return true;
+}
+function clearFocus(){
+ if(focusLayer)focusLayer.clearLayers();
+ if(highlight)highlight.clearLayers();
+ if(cityLayer)cityLayer.clearLayers();
+}
+async function getFine(type,id,signal){
+ const file=files[type]?.[id];if(!file)return null;
+ if(cache.has(file))return cache.get(file);
+ const r=await fetch(GEOBASE+encodeURIComponent(file),{signal,mode:"cors"});
+ if(!r.ok)throw Error("GeoJSON HTTP "+r.status);
+ const json=await r.json();
+ if(json.type!=="FeatureCollection"&&json.type!=="Feature")return null;
+ const good=json.type==="FeatureCollection"?
+ {type:"FeatureCollection",features:json.features.filter(x=>x.geometry&&["Polygon","MultiPolygon"].includes(x.geometry.type))}:json;
+ if(good.type==="FeatureCollection"&&!good.features.length)return null;
+ cache.set(file,good);if(cache.size>18)cache.delete(cache.keys().next().value);
+ return good;
+}
+function selectedOutline(geo,color="#ffcf52"){
+ if(!geo||!map)return null;
+ const layer=window.L.geoJSON(geo,{interactive:false,style:{color,weight:2.6,opacity:.97,fillColor:"#ffcf52",fillOpacity:.09}});
+ layer.addTo(focusLayer);
+ const b=layer.getBounds();return b.isValid()?b:null;
+}
+function chooseCountry(){
+ clearFocus();const b=regionLayer.getBounds();
+ flyBounds(b,6.2);message("Жива карта України · наближай до доріг та вулиць");
+}
+function chooseCity(name,lat,lon){
+ clearFocus();
+ window.L.circleMarker([lat,lon],{radius:8,color:"#fff2bb",weight:2,fillColor:"#ffd452",fillOpacity:1})
+   .bindTooltip(name,{direction:"top"}).addTo(cityLayer);
+ map.flyTo([lat,lon],13.5,{duration:reducedMotion()?0:1.15});
+ message("Місто "+name+" · вулиці та будинки");
+}
+function showRegion(s){
+ const g=pickRegion(s);
+ clearFocus();
+ if(g){
+  const b=selectedOutline({type:"MultiPolygon",coordinates:g.parts});
+  flyBounds(b,9.2);
+  return true;
+ }
+ const center=cityCenters[s.oblast?.name];
+ if(center){map.flyTo(center,12,{duration:reducedMotion()?0:1.1});return true}
+ return false;
+}
+async function navigate(s){
+ current=s||{kind:"country"};
+ if(mode!=="streets")return;
+ const ticket=++seq;
+ if(boundaryAbort)boundaryAbort.abort();
+ boundaryAbort=new AbortController();
  try{
-  await init();
-  if(mode!=="streets")return;
-  map.resize();
-  await selectNow(current);
- }catch(e){resetVisual();tell("Жива мапа недоступна без інтернету або WebGL. Залишено огляд.");}
+  await initialize();
+  if(ticket!==seq||mode!=="streets")return;
+  map.invalidateSize({pan:false});
+  if(s.kind==="country"){chooseCountry();return}
+  if(s.kind==="city"){chooseCity(s.city.name,s.city.lat,s.city.lon);return}
+  if(s.kind==="oblast"){
+   if(showRegion(s))message(s.oblast.name+" · збільшуй до реальних вулиць");
+   else message("Геометрію області не знайдено");
+   return;
+  }
+  // Show genuine parent boundary immediately; never guess a subregion's center.
+  showRegion(s);
+  const type=s.kind==="raion"?"district":"community";
+  const id=s.kind==="raion"?s.raion?.id:s.community?.id;
+  const parentId=s.raion?.id;
+  const exact=!!files[type]?.[id],parent=s.kind==="community"&&!!files.district?.[parentId];
+  if(!exact&&!parent){
+    message("Точні межі не знайдено. Показано батьківську область.");
+    return;
+  }
+  message("Завантажуємо точні межі території…");
+  let geo=null,showingParent=false;
+  try{
+   if(exact)geo=await getFine(type,id,boundaryAbort.signal);
+   if(ticket!==seq||mode!=="streets")return;
+   if(!geo&&parent){geo=await getFine("district",parentId,boundaryAbort.signal);showingParent=true}
+  }catch(e){
+   if(e.name==="AbortError"||ticket!==seq)return;
+   console.warn("Boundary unavailable",e);
+  }
+  if(ticket!==seq||mode!=="streets")return;
+  if(!geo){message("Детальну межу не завантажено. Показано область.");return}
+  clearFocus();
+  const b=selectedOutline(geo);
+  flyBounds(b,s.kind==="community"&&!showingParent?14:12);
+  message(showingParent?"Контур громади відсутній: показано її район. Вулиці можна наближати вручну.":"Межа "+(s.kind==="raion"?"району":"громади")+" · вулиці, дороги й населені пункти");
+ }catch(e){
+  if(ticket!==seq)return;
+  console.warn("Live map navigation error",e);
+  message("Не вдалося оновити карту. Спробуй вибрати територію ще раз.");
+ }
 }
-function choose(sel){current=sel;if(sel.kind==="country"){if(mode==="streets"&&map)selectNow(sel);return}activate(sel,true)}
-overview.addEventListener("click",()=>{++requestId;if(abortController)abortController.abort();resetVisual();tell("Оглядова мапа України — натисни на область")});
-streets.addEventListener("click",()=>activate(current,false));
+async function initialize(){
+ if(startPromise)return startPromise;
+ startPromise=(async()=>{
+ const L=await library();
+ if(!target.isConnected)throw Error("Map container missing");
+ map=L.map(target,{zoomControl:false,attributionControl:true,scrollWheelZoom:true,preferCanvas:false,
+  worldCopyJump:false,minZoom:3,maxZoom:19,zoomAnimation:true,fadeAnimation:true,
+  tap:false,renderer:L.svg({padding:.5})});
+ map.setView([48.5,31.4],5);
+ tiles=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+  attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>',
+  maxZoom:19,maxNativeZoom:19,minZoom:3,updateWhenIdle:true,keepBuffer:2,
+  crossOrigin:false
+ }).addTo(map);
+ let tileErrors=0;
+ tiles.on("tileload",()=>{loadedTile=true});
+ tiles.on("tileerror",()=>{tileErrors++;if(!loadedTile&&tileErrors>4){message("Підкладка вулиць не завантажилась. Перевір мережу або онови сторінку.");}});
+ regionLayer=L.geoJSON(regionJSON,{
+  style:{color:"#3997e8",weight:1.0,opacity:.86,fillColor:"#0b67bb",fillOpacity:.04},
+  onEachFeature(feature,layer){
+   const name=feature.properties.name;
+   layer.on("click",()=>{const o=data.hierarchy.find(a=>norm(a.name)===norm(name));
+    if(o&&window.YE_SELECT_OBLAST)window.YE_SELECT_OBLAST(o.name);
+   });
+   layer.bindTooltip(name,{sticky:true,direction:"top",opacity:.94});
+  }
+ }).addTo(map);
+ focusLayer=L.featureGroup().addTo(map);
+ highlight=L.featureGroup().addTo(map);
+ cityLayer=L.featureGroup().addTo(map);
+ for(const [name,lat,lon] of [
+  ["Київ",50.4501,30.5234],["Львів",49.8397,24.0297],["Одеса",46.4825,30.7233],
+  ["Дніпро",48.4647,35.0462],["Харків",49.9935,36.2304]
+ ]){
+  L.circleMarker([lat,lon],{radius:4,color:"#ffdf7c",weight:1,fillColor:"#ffd452",fillOpacity:1})
+  .bindTooltip(name,{permanent:false,direction:"right"})
+  .addTo(highlight);
+ }
+ // Delayed resize is essential for Safari when changing display:none to visible.
+ requestAnimationFrame(()=>setTimeout(()=>{if(map)map.invalidateSize({pan:false})},150));
+ return map;
+ })();
+ try{return await startPromise}catch(e){
+  if(map){map.remove();map=null}
+  startPromise=null;throw e;
+ }
+}
+async function activate(s){
+ current=s||current;
+ mode="streets";toggleUI();
+ message("Підключаємо живу карту вулиць…");
+ try{
+  await navigate(current);
+ }catch(e){
+  console.warn("Raster map unavailable",e);
+  resetToOverview("Не вдалося завантажити Leaflet. Перевір підключення до CDN.");
+ }
+}
+function resetToOverview(msg){
+ ++seq;if(boundaryAbort)boundaryAbort.abort();
+ mode="overview";toggleUI();
+ message(msg||"Оглядова карта. Обери область.");
+}
+function select(s){
+ current=s;
+ if(!s||s.kind==="country"){if(mode==="streets")void navigate(s);return}
+ if(mode!=="streets")void activate(s);
+ else void navigate(s);
+}
+overview.addEventListener("click",()=>resetToOverview());
+streets.addEventListener("click",()=>void activate(current));
 window.YE_LIVE_MAP={
- select:choose,
- zoomIn(){if(mode!=="streets"||!map)return false;map.zoomIn({duration:300});return true},
- zoomOut(){if(mode!=="streets"||!map)return false;map.zoomOut({duration:300});return true},
- zoomHome(){if(mode!=="streets"||!map)return false;selectNow(current);return true},
+ select,
  isLive:()=>mode==="streets",
+ zoomIn(){if(mode!=="streets"||!map)return false;map.zoomIn();return true},
+ zoomOut(){if(mode!=="streets"||!map)return false;map.zoomOut();return true},
+ zoomHome(){if(mode!=="streets"||!map)return false;void navigate(current);return true}
 };
-updateButtons();
+toggleUI();
 })();
