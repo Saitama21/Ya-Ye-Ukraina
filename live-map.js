@@ -81,12 +81,12 @@ function clearFocus(){
 // individual settlements. Do not draw child polygons as the selected parent's outline.
 function canonicalName(value){
  return String(value||"").toLocaleLowerCase("uk")
-   .replace(/\\s+(?:міська|селищна|сільська)\\s+громада$/u,"")
-   .replace(/\\s+район$/u,"")
-   .replace(/\\s+/g," ").trim();
+   .replace(/\s+(?:міська|селищна|сільська)\s+громада$/u,"")
+   .replace(/\s+район$/u,"")
+   .replace(/\s+/g," ").trim();
 }
 async function readGeoFile(file,signal){
- if(!file||!/^[a-z0-9_.-]+\\.geojson$/.test(file))return null;
+ if(!file||!/^[a-z0-9_.-]+\.geojson$/.test(file))return null;
  if(cache.has(file))return cache.get(file);
  const response=await fetch(GEOBASE+encodeURIComponent(file),{signal,mode:"cors"});
  if(!response.ok)throw Error("GeoJSON HTTP "+response.status);
