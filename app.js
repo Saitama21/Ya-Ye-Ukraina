@@ -216,8 +216,8 @@ function renderInfo(){
  $("#info-subtitle").textContent=s.kind==="cityDistrict"?
    "Це район у межах міста, не однойменний район області. Точний контур поки не підтверджено; карту відкрито на рівні міста.":
    "Навігація за довідником адміністративних одиниць";
- const children=s.kind==="country"?areas.length:s.kind==="oblast"?(s.oblast.name==="Київ"?10:s.oblast.raions.length):s.kind==="raion"?s.raion.hromadas.length:0;
- $("#stat-children").textContent=children;$("#stat-children-label").textContent=s.kind==="country"?"Адміністративних одиниць":s.kind==="oblast"?"Районів":s.kind==="raion"?"Громад":"Підрозділів";
+ const children=s.kind==="country"?areas.length:s.kind==="oblast"?(s.oblast.name==="Київ"?cityByName.get("Київ")?.districts.length||0:s.oblast.name==="Севастополь"?0:s.oblast.raions.length):s.kind==="city"?(cityByName.get(s.city.name)?.districts.length||0):s.kind==="raion"?s.raion.hromadas.length:0;
+ $("#stat-children").textContent=children;$("#stat-children-label").textContent=s.kind==="country"?"Адміністративних одиниць":s.kind==="city"||(s.kind==="oblast"&&s.oblast.name==="Київ")?"Районів у місті":s.kind==="oblast"?"Районів області":s.kind==="raion"?"Громад":"Підрозділів";
  $("#stat-local").textContent=cards.filter(matchingCard).length;$("#stat-total").textContent=cards.length;
  $("#stat-cities").textContent=s.kind==="country"?cities.length:(s.kind==="city"||s.kind==="cityDistrict")?1:0;
  $("#stat-local-label").textContent="Моїх демокарток тут";$("#stat-total-label").textContent="Моїх демокарток загалом";$("#stat-cities-label").textContent=s.kind==="country"?"Маркерів міст":"Обраних міст";
@@ -261,7 +261,7 @@ document.querySelectorAll("[data-level]").forEach(b=>b.onclick=()=>{
 });
 document.querySelectorAll("[data-district-type]").forEach(b=>b.onclick=()=>{
  districtMode=b.dataset.districtType;
- document.querySelectorAll("[data-district-type]").forEach(x=>x.classList.toggle("active",x===b));
+ document.querySelectorAll("[data-district-type]").forEach(x=>{x.classList.toggle("active",x===b);x.setAttribute("aria-pressed",String(x===b))});
  renderTree();
 });
 document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{
