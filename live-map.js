@@ -146,7 +146,7 @@ function showRegion(s){
 const cityDistricts=window.YE_CITY_DISTRICTS||[];
 const cityDistrictCache=new Map();
 let urbanLayer=null;
-const urbanKey=x=>String(x||"").toLocaleLowerCase("uk").replace(/[’']/g,"'").replace(/\\s+район$/u,"").trim();
+const urbanKey=x=>String(x||"").toLocaleLowerCase("uk").replace(/[’']/g,"'").replace(/\s+район$/u,"").trim();
 function stitchOuter(members){
  const segments=(members||[]).filter(m=>m.role==="outer"&&Array.isArray(m.geometry)&&m.geometry.length>1)
   .map(m=>m.geometry.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).map(p=>[p.lon,p.lat]))
@@ -264,7 +264,19 @@ async function navigate(s){
   map.invalidateSize({pan:false});
   if(s.kind!=="cityDistrict")urbanLayer?.clearLayers();
   if(s.kind==="country"){chooseCountry();return}
-  if(s.kind==="city"){chooseCity(s.city.name,s.city.lat,s.city.lon);return}
+  if(s.kind==="city"){
+    chooseCity(s.city.name,s.city.lat,s.city.lon);
+    const city=cityDistricts.find(x=>x.city===s.city.name);
+    if(city){
+      try{
+        const geometries=await getCityDistricts(city,boundaryAbort.signal);
+        if(ticket!==seq||mode!=="streets")return;
+        showCityDistrictLayer(city,geometries,null);
+        message(geometries.size?"Обери район міста "+city.city+" безпосередньо на мапі або у списку.":"Для міста "+city.city+" межі районів поки не знайдено.");
+      }catch(e){if(ticket===seq&&e.name!=="AbortError")message("Мапа міста доступна, але межі районів наразі не завантажені.");}
+    }
+    return;
+  }
   if(s.kind==="cityDistrict"){
     await navigateCityDistrict(s,ticket,boundaryAbort.signal);
     return;
