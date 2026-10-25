@@ -46,3 +46,30 @@
 .tile-retry{position:absolute;left:13px;top:12px;z-index:5;border:1px solid #6599c3;border-radius:11px;background:#082443e8;color:#fff2c3;backdrop-filter:blur(13px);font-size:12px;font-weight:700;padding:10px 13px;box-shadow:0 5px 25px #0008}
 .tile-retry[hidden]{display:none!important}
 .tile-retry:hover{border-color:#ffd452}
+
+/* === ПІКСЕЛІ / LOCAL PIXEL CARD v0.6 === */
+.pixel-overlay{position:absolute;inset:0;z-index:2;pointer-events:none;width:100%;height:100%;display:block}
+.pixel-overlay[hidden],.pixel-banner[hidden],.pixel-preview[hidden]{display:none!important}
+.pixel-banner{position:absolute;top:12px;left:12px;right:12px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 15px;border-radius:14px;border:1px solid #5b93c6;background:linear-gradient(120deg,#092b4ef5,#0a203af4);box-shadow:0 7px 24px #0009;backdrop-filter:blur(18px)}
+.pixel-banner b{color:#ffdc70;font-size:13px;letter-spacing:.2px}.pixel-banner p{font-size:11px;line-height:1.45;color:#bad8ef;margin:5px 0 0}
+.pixel-banner button{border:1px solid #5180a9;border-radius:10px;padding:11px 13px;background:#163858;color:#eaf7ff;white-space:nowrap;font-size:12px;font-weight:700}
+.pixel-preview{position:absolute;bottom:17px;left:15px;right:70px;max-width:435px;z-index:4;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:15px;border:1px solid #ffd452aa;background:#071d36ed;box-shadow:0 10px 30px #000b;backdrop-filter:blur(18px)}
+.pixel-preview .pixel-icon{font-size:30px;line-height:1;color:#ffd452;text-shadow:0 0 14px #ffe081}
+.pixel-preview div{min-width:0;flex:1}.pixel-preview strong{font-size:14px;color:#fff;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pixel-preview small{font-size:11px;color:#acc6de;display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pixel-preview button{border:0;border-radius:10px;padding:11px 14px;color:#071a30;font-size:12px;font-weight:750;background:#ffd452;white-space:nowrap}
+.pixel-choice-info{margin:12px 0 3px;color:#ffda72;background:#122c47;border:1px solid #b9933e77;padding:11px;border-radius:10px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.pixel-card-meta{font-size:12px;color:#ffd56a;margin-top:12px;overflow-wrap:anywhere}
+.secondary-cta{background:#18446e;color:#dceefa;border:1px solid #366c9b;box-shadow:none}
+.map-mode button{transition:background-color .15s,color .15s}
+.street-map.is-picking{cursor:crosshair!important}
+.street-map.is-picking .leaflet-interactive{cursor:crosshair!important}
+@media(max-width:550px){
+ .map-toolbar{flex-wrap:wrap;align-items:flex-start}
+ .map-mode{width:100%;justify-content:space-between}
+ .map-mode button{flex:1;padding:10px 5px;font-size:11px}
+ .pixel-banner{top:10px;left:9px;right:9px;padding:10px 12px;gap:8px}
+ .pixel-banner button{padding:10px;font-size:11px}
+ .pixel-preview{left:8px;bottom:8px;right:55px;padding:9px 10px;gap:7px}
+ .pixel-preview strong{font-size:12px}.pixel-preview small{font-size:10px}
+ .pixel-preview button{padding:9px 8px;font-size:11px}
+}
