@@ -1,6 +1,6 @@
 # Я Є. Україна 🇺🇦
 
-**Dark Ukraine Hybrid — nationwide map prototype (v0.6 — local pixel-linked cards).**
+**Dark Ukraine Hybrid — nationwide map prototype (v0.7 — raions within cities).**
 
 A responsive, self-hosted, offline-capable-after-loading static web demo of Ukraine's administrative hierarchy. No backend, payment processing or fictitious public-user counts. Street-mode resources are loaded from third-party CDNs and require internet.
 
@@ -87,3 +87,13 @@ Now the implementation selects **exactly one matching OSM relation polygon** fro
 ### Privacy
 
 Precise cell coordinates are stored on the user's own device. Sharing the card's pixel ID is voluntary and can disclose the selected approximate location, so the production product must offer visibility/privacy controls before exposing user positions publicly.
+
+## v0.7 — city raions are no longer confused with oblast raions
+
+The **Райони** sidebar now has two disjoint catalogs: **Райони міст (55)** and **Райони областей (137 records in the existing dataset after removing city placeholder records)**. The former has verified current district *names* for Kyiv (10), Kharkiv (9), Dnipro (8), Odesa (4), Lviv (6), Zaporizhzhia (7), Kryvyi Rih (7), and Mykolaiv (4). In particular, the fake one-entry `Київ район` placeholder is no longer shown as a city district. It is kept in the original reference data for compatibility with existing cards only.
+
+City raion selection has its own `kind: 'cityDistrict'` path, a complete `Україна › місто › район` breadcrumb, region-specific sidebar/search results, and optional local-card metadata `cityDistrictCity` / `cityDistrictName`. It focuses the city-level map but **does not claim a verified district outline or centre** until polygons are obtained and validated. The real pixel position remains user-picked on the street map. No GPS or location inference is performed.
+
+Administrative names were checked against official municipal sources. Reference URLs are preserved in `city-districts.js` for Kyiv City Council, Kharkiv municipal publications, Dnipro City Council, Odesa City Council, Lviv City Council, Zaporizhzhia City Council (including the 2026 name «Космічний»), Kryvyi Rih City Council, and Mykolaiv City Council. This is a curated **8-city initial coverage**, not a complete list of all Ukrainian urban districts.
+
+The country statistics still show the numbers from the original administrative-reference data separately from the curated urban district names. City district entries are not added to the oblast-level raion total to avoid mixing incompatible administrative levels.
