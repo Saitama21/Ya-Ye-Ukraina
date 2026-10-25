@@ -1,8 +1,8 @@
 # Я Є. Україна 🇺🇦
 
-**Dark Ukraine Hybrid — nationwide map prototype (v0.3).**
+**Dark Ukraine Hybrid — nationwide map prototype (v0.4).**
 
-A responsive, self-hosted, offline-capable-after-loading static web demo of Ukraine's administrative hierarchy. No backend, payment processing, CDN runtime dependency, or fictitious public-user counts.
+A responsive, self-hosted, offline-capable-after-loading static web demo of Ukraine's administrative hierarchy. No backend, payment processing or fictitious public-user counts. Street-mode resources are loaded from third-party CDNs and require internet.
 
 ## Live streets map (prototype)
 
@@ -10,7 +10,7 @@ A responsive, self-hosted, offline-capable-after-loading static web demo of Ukra
 - Selecting an oblast, district, community or city from the existing hierarchy automatically opens the live basemap and animates toward the selected territory.
 - All 25 geographical region polygons remain interactive on the live map; basemap supplies street/road labels at closer zoom levels.
 - On-demand boundary file lookups exist for **114 districts** and **661 hromadas** (availability in this external OSM-derived source is incomplete). Example: Київська область → Фастівський район → Калинівська громада.
-- Where detailed boundaries are not available, the map zooms to the parent oblast and explicitly says so; it does not invent a point.
+- When the selected community boundary is unavailable, the app tries the actual parent district; if that is unavailable it falls back to the oblast. It explicitly reports the limited precision and never invents a location.
 - A lack of WebGL or internet falls back to the SVG overview. MapLibre's CDN bundle and live streets require internet in this build. The list and SVG overview remain locally usable after the static page assets are cached by the browser, but a full offline PWA cache/service worker is NOT yet provided.
 - Map data attribution is visible on the live basemap (OpenFreeMap / OpenMapTiles / OpenStreetMap). No geocoding or autocomplete calls to public Nominatim.
 
