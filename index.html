@@ -4,8 +4,8 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#06172e">
 <meta name="description" content="Я Є. Україна — інтерактивна мапа областей, районів, громад та українських міст. Локальна демонстрація цифрової спільноти.">
 <title>Я Є. Україна — мапа областей, районів і громад</title>
-<link rel="stylesheet" href="leaflet.css?v=0.5.2"><link rel="stylesheet" href="styles.css?v=0.6.0">
-<script src="territories.js" defer></script><script src="boundary-index.js" defer></script><script src="app.js?v=0.6.0" defer></script><script src="live-map.js?v=0.6.0" defer></script><script src="pixel-map.js?v=0.6.0" defer></script>
+<link rel="stylesheet" href="leaflet.css?v=0.5.2"><link rel="stylesheet" href="styles.css?v=0.7.0">
+<script src="territories.js" defer></script><script src="boundary-index.js" defer></script><script src="city-districts.js?v=0.7.0" defer></script><script src="app.js?v=0.7.0" defer></script><script src="live-map.js?v=0.7.0" defer></script><script src="pixel-map.js?v=0.7.0" defer></script>
 </head>
 <body>
 <div class="app-shell">
@@ -20,8 +20,12 @@
 <div class="tabbar"><button type="button" data-tab="map" class="active">▦ Мапа</button><button type="button" data-tab="search">⌕ Пошук</button><button type="button" data-tab="mine">★ Мої</button></div>
 <div class="search-field"><input id="place-search" type="search" placeholder="Область, район, громада чи місто…" aria-label="Пошук по всій Україні" autocomplete="off"></div>
 <div class="filters" role="group" aria-label="Рівні адміністративного поділу"><button type="button" class="active" data-level="oblast">Області <span id="oblast-total">—</span></button><button type="button" data-level="raion">Райони <span id="raion-total">—</span></button><button type="button" data-level="community">Громади <span id="community-total">—</span></button></div>
+<div id="district-kind-switch" class="district-kind-switch" role="group" aria-label="Тип районів" hidden>
+<button type="button" data-district-type="urban" class="active" aria-pressed="true">🏙 Райони міст <span id="district-urban-count">—</span></button>
+<button type="button" data-district-type="land" aria-pressed="false">⌑ Райони областей <span id="district-land-count">—</span></button>
+</div>
 <div id="area-tree" class="tree" aria-live="polite"></div>
-<div class="geo-note">Дані справочника: області, райони та громади. Жива карта показує реальні дороги й вулиці. Доступні межі районів і громад підвантажуються при виборі; для решти показуємо межу області.</div>
+<div class="geo-note">Райони міст та райони областей — різні рівні поділу. Для міст без підтверджених меж карта показує місто без вигаданих контурів.</div>
 </aside>
 <div class="glass map-panel">
 <div class="map-toolbar"><div><h2 id="map-selection">Вся Україна</h2><small id="map-status">Клікни область або позначку міста</small></div><div class="map-mode" role="group" aria-label="Режим карти"><button id="mode-overview" type="button" class="active" aria-pressed="true">◈ Огляд</button><button id="mode-streets" type="button" aria-pressed="false">⌖ Вулиці</button><button id="mode-pixels" type="button" class="active" aria-pressed="true">▦ Пікселі</button></div></div>
@@ -48,8 +52,8 @@
 </div>
 <div class="kpi-row" aria-label="Довідкова статистика">
 <div class="kpi"><div class="kpi-label">◈ Адміністративні одиниці першого рівня</div><strong class="gold" id="kpi-oblast">—</strong><small>24 області · АР Крим · Київ · Севастополь</small></div>
-<div class="kpi"><div class="kpi-label">⌑ Райони в наборі даних</div><strong id="kpi-raion">—</strong><small>Наявна структура довідника</small></div>
-<div class="kpi"><div class="kpi-label">⌂ Територіальні громади</div><strong id="kpi-community">—</strong><small>Пошук за всіма назвами</small></div>
+<div class="kpi"><div class="kpi-label">⌑ Райони в наборі даних</div><strong id="kpi-raion">—</strong><small>Райони областей, без умовних записів міст</small></div>
+<div class="kpi"><div class="kpi-label">⌂ Територіальні громади</div><strong id="kpi-community">—</strong><small>Окремо доступні райони міст</small></div>
 <div class="kpi"><div class="kpi-label">★ Мої локальні демокартки</div><strong class="gold" id="kpi-cards">0</strong><small><span id="kpi-city">—</span> орієнтирів великих міст</small></div>
 </div></section>
 <section id="story" class="intro" style="padding:70px 6px 20px"><div><div class="kicker">ДЕ Б ТИ НЕ БУВ</div><h1>Ти — частина <b>України.</b></h1><p>Ми створюємо цифровий простір, де кожна людина може залишити свою історію.</p></div></section>
