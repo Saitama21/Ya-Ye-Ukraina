@@ -140,6 +140,118 @@ function showRegion(s){
  if(center){map.flyTo(center,12,{duration:reducedMotion()?0:1.05});return true}
  return false;
 }
+
+/* City-raion geometries are fetched from OSM only when needed, never fabricated.
+   Overpass returns relation member ways, not GeoJSON; reconstruct closed outer rings. */
+const cityDistricts=window.YE_CITY_DISTRICTS||[];
+const cityDistrictCache=new Map();
+let urbanLayer=null;
+const urbanKey=x=>String(x||"").toLocaleLowerCase("uk").replace(/[’']/g,"'").replace(/\\s+район$/u,"").trim();
+function stitchOuter(members){
+ const segments=(members||[]).filter(m=>m.role==="outer"&&Array.isArray(m.geometry)&&m.geometry.length>1)
+  .map(m=>m.geometry.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).map(p=>[p.lon,p.lat]))
+  .filter(a=>a.length>1);
+ const rings=[];
+ const equal=(a,b)=>Math.abs(a[0]-b[0])<1e-7&&Math.abs(a[1]-b[1])<1e-7;
+ while(segments.length){
+  const ring=segments.pop().slice();
+  let steps=0;
+  while(!equal(ring[0],ring[ring.length-1])&&steps++<10000){
+   let index=-1,flip=false,prepend=false;
+   for(let i=0;i<segments.length;i++){
+    const s=segments[i],first=ring[0],last=ring[ring.length-1];
+    if(equal(last,s[0])){index=i;break}
+    if(equal(last,s[s.length-1])){index=i;flip=true;break}
+    if(equal(first,s[s.length-1])){index=i;prepend=true;break}
+    if(equal(first,s[0])){index=i;flip=true;prepend=true;break}
+   }
+   if(index<0)break;
+   const s=segments.splice(index,1)[0];if(flip)s.reverse();
+   if(prepend)ring.unshift(...s.slice(0,-1));else ring.push(...s.slice(1));
+  }
+  if(ring.length>=4&&equal(ring[0],ring[ring.length-1]))rings.push(ring);
+ }
+ return rings;
+}
+async function getCityDistricts(city,signal){
+ if(cityDistrictCache.has(city.city))return cityDistrictCache.get(city.city);
+ // Bound queries to the selected city vicinity, avoiding unrelated Ukraine-wide districts.
+ const south=(city.lat-.21).toFixed(5),north=(city.lat+.21).toFixed(5);
+ const west=(city.lon-.31).toFixed(5),east=(city.lon+.31).toFixed(5);
+ const query='[out:json][timeout:35];relation["boundary"="administrative"]["admin_level"~"^(9|10)$"]('+[south,west,north,east].join(',')+');out geom;';
+ const timer=new AbortController();
+ const timeout=setTimeout(()=>timer.abort(),42000);
+ const stop=()=>timer.abort();
+ signal?.addEventListener("abort",stop,{once:true});
+ try{
+  const response=await fetch("https://overpass-api.de/api/interpreter",{
+   method:"POST",body:new URLSearchParams({data:query}),
+   headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+   signal:timer.signal,mode:"cors"
+  });
+  if(!response.ok)throw Error("Overpass HTTP "+response.status);
+  const payload=await response.json();
+  if(!Array.isArray(payload.elements))throw Error("Invalid Overpass response");
+  const found=new Map(),ambiguous=new Set();
+  const names=new Map(city.districts.map(name=>[urbanKey(name),name]));
+  for(const relation of payload.elements){
+   if(relation.type!=="relation")continue;
+   const matched=names.get(urbanKey(relation.tags?.["name:uk"]||relation.tags?.name))
+    ||names.get(urbanKey(relation.tags?.name));
+   if(!matched)continue;
+   const rings=stitchOuter(relation.members);
+   if(!rings.length)continue;
+   if(found.has(matched)){ambiguous.add(matched);continue}
+   found.set(matched,{type:"Feature",properties:{name:matched,city:city.city,osmId:relation.id},
+    geometry:{type:"MultiPolygon",coordinates:rings.map(r=>[r])}});
+  }
+  for(const name of ambiguous)found.delete(name);
+  cityDistrictCache.set(city.city,found);
+  return found;
+ }finally{clearTimeout(timeout);signal?.removeEventListener("abort",stop)}
+}
+function showCityDistrictLayer(city,features,selected){
+ if(!map||!urbanLayer)return null;
+ urbanLayer.clearLayers();
+ let focused=null;
+ for(const [name,geo] of features){
+  const active=name===selected;
+  const layer=window.L.geoJSON(geo,{
+   style:{color:active?"#ffcf52":"#67b6ff",weight:active?3.5:1.6,
+    opacity:1,fillColor:active?"#ffcf52":"#3997e8",fillOpacity:active?.17:.045},
+   onEachFeature(_,path){
+    path.bindTooltip(name+" район",{sticky:true});
+    path.on("click",event=>{
+     if(window.YE_PIXELS?.isPicking?.())return;
+     window.L.DomEvent.stopPropagation(event);
+     window.YE_SELECT_CITY_DISTRICT?.(city.city,name);
+    });
+   }
+  }).addTo(urbanLayer);
+  if(active)focused=layer.getBounds();
+ }
+ return focused;
+}
+async function navigateCityDistrict(s,ticket,signal){
+ clearFocus();
+ urbanLayer?.clearLayers();
+ const city=cityDistricts.find(c=>c.city===s.city.name);
+ if(!city){message("Міські райони цього міста відсутні у довіднику.");return}
+ map.setView([city.lat,city.lon],11.5,{animate:!reducedMotion()});
+ message("Завантажуємо перевірені геометрії районів міста "+city.city+"…");
+ try{
+  const geometries=await getCityDistricts(city,signal);
+  if(ticket!==seq||mode!=="streets")return;
+  const b=showCityDistrictLayer(city,geometries,s.district.name);
+  if(b?.isValid()){flyBounds(b,15);message("Жовтим позначено "+s.district.name+" район міста "+city.city+". Натискай інші контури для вибору.");}
+  else message("Точну межу "+s.district.name+" району не знайдено у геоданих OSM. Помилковий контур не показуємо.");
+ }catch(e){
+  if(ticket!==seq||e.name==="AbortError")return;
+  console.warn("City district geometry unavailable",e);
+  message("Сервіс меж районів недоступний. Залишено мапу міста без вигаданих контурів.");
+ }
+}
+
 async function navigate(s){
  current=s||{kind:"country"};
  if(mode!=="streets")return;
@@ -150,16 +262,11 @@ async function navigate(s){
   await initialize();
   if(ticket!==seq||mode!=="streets")return;
   map.invalidateSize({pan:false});
+  if(s.kind!=="cityDistrict")urbanLayer?.clearLayers();
   if(s.kind==="country"){chooseCountry();return}
   if(s.kind==="city"){chooseCity(s.city.name,s.city.lat,s.city.lon);return}
   if(s.kind==="cityDistrict"){
-    // Urban raions are a DIFFERENT administrative level from oblast raions.
-    // Verified district names exist, but exact polygons have not been imported.
-    // Do not draw a fictional border or mark the city centre as a district centre.
-    clearFocus();
-    map.setView([s.city.lat,s.city.lon],11.5,{animate:!reducedMotion()});
-    message(s.district.name+" район міста "+s.city.name+
-      " · точних меж поки немає. Показано огляд міста; обери піксель вручну.");
+    await navigateCityDistrict(s,ticket,boundaryAbort.signal);
     return;
   }
   if(s.kind==="oblast"){
@@ -256,6 +363,7 @@ async function initialize(){
  focusLayer=L.featureGroup().addTo(map);
  highlight=L.featureGroup().addTo(map);
  cityLayer=L.featureGroup().addTo(map);
+ urbanLayer=L.featureGroup().addTo(map);
  for(const [name,lat,lon] of [
   ["Київ",50.4501,30.5234],["Львів",49.8397,24.0297],["Одеса",46.4825,30.7233],
   ["Дніпро",48.4647,35.0462],["Харків",49.9935,36.2304]
