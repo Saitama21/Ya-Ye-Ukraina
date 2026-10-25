@@ -115,10 +115,10 @@ function renderPreview(c){
  }else mini.hidden=true;
  drawSoon();
 }
-async function streetMap(selection){
+async function streetMap(selection,focusSelection=true){
  const control=window.YE_LIVE_MAP;
  if(!control?.ensureStreets)throw Error("Стріт-мапа не готова.");
- const instance=await control.ensureStreets(selection);
+ const instance=await control.ensureStreets(selection,focusSelection);
  if(!instance)throw Error("Не вдалося завантажити мапу вулиць. Перевір інтернет.");
  connect(instance);
  enabled(true);
@@ -171,7 +171,7 @@ async function show(card){
  if(!getPoint(card))return false;
  const ticket=++operation;finishPick();
  try{
-   const m=await streetMap({kind:"country"});
+   const m=await streetMap({kind:"country"},false);
    if(ticket!==operation)return false;
    renderPreview(card);
    m.setView([card.lat,card.lng],17,{animate:!window.matchMedia("(prefers-reduced-motion: reduce)").matches});
@@ -182,8 +182,9 @@ async function show(card){
 }
 cancel.addEventListener("click",cancelPick);
 toggle.addEventListener("click",async()=>{
- if(!pixelsOn){try{await streetMap({kind:"country"})}catch(e){alert(e.message);return}}
- enabled(!pixelsOn);
+ if(pixelsOn){enabled(false);return}
+ try{await streetMap({kind:"country"},false);enabled(true)}
+ catch(e){alert(e.message)}
 });
 const waitForMap=()=>{
  const ctrl=window.YE_LIVE_MAP;
@@ -198,7 +199,7 @@ const actual=()=>{
  connect(m);m.on("click",onMapClick);
 };
 window.addEventListener("ye:map-ready",actual);
-window.YE_PIXELS={pointToCell,setCards,beginPick,cancelPick,show,renderPreview,getPoint,occupied,drawSoon};
+window.YE_PIXELS={pointToCell,setCards,beginPick,cancelPick,show,renderPreview,getPoint,occupied,drawSoon,isPicking:()=>picking};
 setCards(window.YE_GET_CARDS?.()||[]);
 actual();
 })();
