@@ -152,6 +152,16 @@ async function navigate(s){
   map.invalidateSize({pan:false});
   if(s.kind==="country"){chooseCountry();return}
   if(s.kind==="city"){chooseCity(s.city.name,s.city.lat,s.city.lon);return}
+  if(s.kind==="cityDistrict"){
+    // Urban raions are a DIFFERENT administrative level from oblast raions.
+    // Verified district names exist, but exact polygons have not been imported.
+    // Do not draw a fictional border or mark the city centre as a district centre.
+    clearFocus();
+    map.setView([s.city.lat,s.city.lon],11.5,{animate:!reducedMotion()});
+    message(s.district.name+" район міста "+s.city.name+
+      " · точних меж поки немає. Показано огляд міста; обери піксель вручну.");
+    return;
+  }
   if(s.kind==="oblast"){
    if(showRegion(s))message(s.oblast.name+" · збільшуй до реальних вулиць");
    else message("Геометрію області не знайдено");
