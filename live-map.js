@@ -62,9 +62,11 @@ function boundsOf(obj){
 }
 function flyBounds(b,z){
  if(!b||!map)return false;
- const pad=root.clientWidth<580?[25,25]:[50,50];
- const opts={padding:pad,maxZoom:z||14,animate:!reducedMotion(),duration:.95};
- map.flyToBounds(b,opts);return true;
+ const pad=root.clientWidth<580?[18,18]:[36,36];
+ const opts={padding:pad,maxZoom:z||14,animate:false};
+ map.fitBounds(b,opts);
+ requestAnimationFrame(()=>map?.invalidateSize({pan:false}));
+ return true;
 }
 function clearFocus(){
  if(focusLayer)focusLayer.clearLayers();
@@ -98,7 +100,7 @@ function chooseCity(name,lat,lon){
  clearFocus();
  window.L.circleMarker([lat,lon],{radius:8,color:"#fff2bb",weight:2,fillColor:"#ffd452",fillOpacity:1})
    .bindTooltip(name,{direction:"top"}).addTo(cityLayer);
- map.flyTo([lat,lon],13.5,{duration:reducedMotion()?0:1.15});
+ map.setView([lat,lon],13.5,{animate:false});
  message("Місто "+name+" · вулиці та будинки");
 }
 function showRegion(s){
@@ -110,7 +112,7 @@ function showRegion(s){
   return true;
  }
  const center=cityCenters[s.oblast?.name];
- if(center){map.flyTo(center,12,{duration:reducedMotion()?0:1.1});return true}
+ if(center){map.setView(center,12,{animate:false});return true}
  return false;
 }
 async function navigate(s){
@@ -169,12 +171,12 @@ async function initialize(){
  const L=await library();
  if(!target.isConnected)throw Error("Map container missing");
  map=L.map(target,{zoomControl:false,attributionControl:true,scrollWheelZoom:true,preferCanvas:false,
-  worldCopyJump:false,minZoom:3,maxZoom:19,zoomAnimation:true,fadeAnimation:true,
+  worldCopyJump:false,minZoom:3,maxZoom:19,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false,
   tap:false,renderer:L.svg({padding:.5})});
  map.setView([48.5,31.4],5);
  tiles=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
   attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>',
-  maxZoom:19,maxNativeZoom:19,minZoom:3,updateWhenIdle:true,keepBuffer:2,
+  maxZoom:19,maxNativeZoom:19,minZoom:3,updateWhenIdle:true,updateWhenZooming:false,keepBuffer:1,
   crossOrigin:false
  }).addTo(map);
  let tileErrors=0;
@@ -201,8 +203,17 @@ async function initialize(){
   .bindTooltip(name,{permanent:false,direction:"right"})
   .addTo(highlight);
  }
- // Delayed resize is essential for Safari when changing display:none to visible.
- requestAnimationFrame(()=>setTimeout(()=>{if(map)map.invalidateSize({pan:false})},150));
+ // Safari: compensate for deferred flex layout, visual tab transitions and iPad split view.
+ const refresh=()=>{if(map&&mode==="streets"&&target.isConnected&&!target.hidden)
+   map.invalidateSize({pan:false,debounceMoveend:true})};
+ const observer=new ResizeObserver(()=>refresh());
+ observer.observe(target);
+ if(window.matchMedia("(pointer:coarse)").matches){
+   document.addEventListener("visibilitychange",()=>{if(!document.hidden)requestAnimationFrame(refresh)});
+   window.addEventListener("pageshow",refresh);
+ }
+ requestAnimationFrame(()=>requestAnimationFrame(refresh));
+ setTimeout(refresh,220);setTimeout(refresh,800);
  return map;
  })();
  try{return await startPromise}catch(e){
