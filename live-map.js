@@ -235,7 +235,9 @@ async function initialize(){
   style:{color:"#3997e8",weight:1.0,opacity:.86,fillColor:"#0b67bb",fillOpacity:.04},
   onEachFeature(feature,layer){
    const name=feature.properties.name;
-   layer.on("click",()=>{const o=data.hierarchy.find(a=>norm(a.name)===norm(name));
+   layer.on("click",()=>{
+    if(window.YE_PIXELS?.isPicking?.())return;
+    const o=data.hierarchy.find(a=>norm(a.name)===norm(name));
     if(o&&window.YE_SELECT_OBLAST)window.YE_SELECT_OBLAST(o.name);
    });
    layer.bindTooltip(name,{sticky:true,direction:"top",opacity:.94});
@@ -263,6 +265,8 @@ async function initialize(){
  }
  requestAnimationFrame(()=>requestAnimationFrame(refresh));
  setTimeout(refresh,220);setTimeout(refresh,800);
+ // Let independent pixel layer bind once Leaflet exists.
+ window.dispatchEvent(new CustomEvent("ye:map-ready"));
  return map;
  })();
  try{return await startPromise}catch(e){
@@ -297,6 +301,22 @@ streets.addEventListener("click",()=>void activate(current));
 window.YE_LIVE_MAP={
  select,
  isLive:()=>mode==="streets",
+ getMap:()=>map,
+ async ensureStreets(sel,focusSelection=true){
+   if(sel)current=sel;
+   mode="streets";toggleUI();
+   try{
+     await initialize();
+     if(!map)return null;
+     map.invalidateSize({pan:false});
+     if(focusSelection)await navigate(current);
+     return map;
+   }catch(e){
+     console.warn("Street mode initialization failed",e);
+     resetToOverview("Не вдалося завантажити мапу вулиць.");
+     return null;
+   }
+ },
  zoomIn(){if(mode!=="streets"||!map)return false;map.zoomIn();return true},
  zoomOut(){if(mode!=="streets"||!map)return false;map.zoomOut();return true},
  zoomHome(){if(mode!=="streets"||!map)return false;void navigate(current);return true}
