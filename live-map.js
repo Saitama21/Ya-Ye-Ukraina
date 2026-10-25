@@ -159,7 +159,8 @@ async function navigate(s){
  }catch(e){
   if(ticket!==seq)return;
   console.warn("Live map navigation error",e);
-  message("Не вдалося оновити карту. Спробуй вибрати територію ще раз.");
+  if(!map){resetToOverview("Карта вулиць не завантажилась. Перевір CDN або спробуй оновити сторінку.");return}
+  message("Не вдалося оновити геометрію. Вулиці залишаються доступними.");
  }
 }
 async function initialize(){
