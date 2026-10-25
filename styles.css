@@ -73,3 +73,18 @@
  .pixel-preview strong{font-size:12px}.pixel-preview small{font-size:10px}
  .pixel-preview button{padding:9px 8px;font-size:11px}
 }
+
+/* City raions are distinct from oblast-level raions. */
+.district-kind-switch{display:flex;align-items:stretch;gap:7px;margin:0 0 12px}
+.district-kind-switch[hidden]{display:none!important}
+.district-kind-switch button{flex:1;min-width:0;border:1px solid #2d557d;border-radius:10px;background:#092540;color:#accce7;padding:11px 7px;line-height:1.35;font-size:11px;font-weight:700}
+.district-kind-switch button.active{color:#102338;background:#ffd452;border-color:#ffd452;box-shadow:0 3px 15px #ffc73c2a}
+.district-kind-switch span{font-variant-numeric:tabular-nums}
+.tree button.city-header{padding:13px 10px;background:linear-gradient(120deg,#102f55,#0b243f);border-color:#386695;color:#e5f4ff;font-weight:800}
+.tree button.city-header small{color:#ffd45a;font-size:12px}
+.tree button.urban-district{padding-left:21px;background:#0a2139}
+.tree button.urban-district.active{border-color:#f6c957;background:#243650;color:#ffd452}
+@media(max-width:550px){
+ .district-kind-switch button{font-size:11px;padding:10px 5px}
+ .tree button.city-header{padding:12px 8px}
+}
