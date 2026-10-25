@@ -5,7 +5,8 @@
 <meta name="description" content="Я Є. Україна — інтерактивна мапа областей, районів, громад та українських міст. Локальна демонстрація цифрової спільноти.">
 <title>Я Є. Україна — мапа областей, районів і громад</title>
 <link rel="stylesheet" href="styles.css">
-<script src="territories.js" defer></script><script src="app.js" defer></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.css">
+<script src="territories.js" defer></script><script src="boundary-index.js" defer></script><script src="app.js" defer></script><script src="live-map.js" defer></script>
 </head>
 <body>
 <div class="app-shell">
@@ -21,17 +22,18 @@
 <div class="search-field"><input id="place-search" type="search" placeholder="Область, район, громада чи місто…" aria-label="Пошук по всій Україні" autocomplete="off"></div>
 <div class="filters" role="group" aria-label="Рівні адміністративного поділу"><button type="button" class="active" data-level="oblast">Області <span id="oblast-total">—</span></button><button type="button" data-level="raion">Райони <span id="raion-total">—</span></button><button type="button" data-level="community">Громади <span id="community-total">—</span></button></div>
 <div id="area-tree" class="tree" aria-live="polite"></div>
-<div class="geo-note">Дані справочника: області, райони та громади. Для районів і громад зараз доступні пошук і навігація; деталізовані кордони додаються окремо.</div>
+<div class="geo-note">Дані справочника: області, райони та громади. Жива карта показує реальні дороги й вулиці. Доступні межі районів і громад підвантажуються при виборі; для решти показуємо межу області.</div>
 </aside>
 <div class="glass map-panel">
-<div class="map-toolbar"><div><h2 id="map-selection">Вся Україна</h2><small id="map-status">Клікни область або позначку міста</small></div><span class="map-tag">ГЕОМАПА · ДЕМО</span></div>
-<div class="map-wrap">
+<div class="map-toolbar"><div><h2 id="map-selection">Вся Україна</h2><small id="map-status">Клікни область або позначку міста</small></div><div class="map-mode" role="group" aria-label="Режим карти"><button id="mode-overview" type="button" class="active" aria-pressed="true">◈ Огляд</button><button id="mode-streets" type="button" aria-pressed="false">⌖ Вулиці</button></div></div>
+<div class="map-wrap" id="map-wrap">
+<div id="street-map" class="street-map" aria-label="Жива карта вулиць України" hidden></div>
 <svg id="ukraine-map" viewBox="0 0 900 600" role="group" aria-label="Мапа України. Клікніть область для вибору" preserveAspectRatio="xMidYMid meet">
 <defs><pattern id="mesh" width="21" height="21" patternUnits="userSpaceOnUse"><path d="M21 0H0V21" class="map-grid"/></pattern>
 <filter id="soft-glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
 <rect width="900" height="600" fill="url(#mesh)"></rect><g id="region-layer"></g><g id="city-layer"></g>
 </svg><div class="zoom-controls" aria-label="Масштаб мапи"><button type="button" id="zoom-in" aria-label="Наблизити">+</button><button type="button" id="zoom-out" aria-label="Віддалити">−</button><button type="button" id="zoom-home" aria-label="Центрувати">⌖</button></div>
-</div><div class="map-caption"><span>● <b>Золоті</b> та сині позначки — міста, не покупки.</span><span id="your-location">Вся Україна</span></div></div>
+</div><div class="map-caption"><span id="map-data-hint">● <b>Золоті</b> та сині позначки — міста, не покупки.</span><span id="your-location">Вся Україна</span></div></div>
 <aside class="glass info" aria-label="Інформація про вибрану місцевість">
 <div class="info-hero"><small id="selected-kind">НАЦІОНАЛЬНА МАПА</small><h2 id="selected-title">Вся Україна</h2><p id="selected-location">Україна</p></div>
 <div class="info-tabs"><button type="button" class="active" id="reset-selection">⌂ Вся Україна ↺</button><button type="button" id="jump-map">▧ До мапи</button></div>
@@ -48,7 +50,7 @@
 <div class="kpi"><div class="kpi-label">★ Мої локальні демокартки</div><strong class="gold" id="kpi-cards">0</strong><small><span id="kpi-city">—</span> орієнтирів великих міст</small></div>
 </div></section>
 <section id="story" class="intro" style="padding:70px 6px 20px"><div><div class="kicker">ДЕ Б ТИ НЕ БУВ</div><h1>Ти — частина <b>України.</b></h1><p>Ми створюємо цифровий простір, де кожна людина може залишити свою історію.</p></div></section>
-<footer id="about">© Я Є. Україна · Демонстрація без оплати та публічної реєстрації.<br>Адміністративні назви: Open Admin Data (CC BY 4.0) · Геометрія: OpenStreetMap contributors через darmat1/ukraine-geo-data (ODbL). Позначки великих міст — орієнтовні. Деякі адміністративні записи можуть відрізнятися від поточного офіційного кодифікатора.</footer>
+<footer id="about">© Я Є. Україна · Демонстрація без оплати та публічної реєстрації.<br>Адміністративні назви: Open Admin Data (CC BY 4.0) · Геометрія: OpenStreetMap contributors через darmat1/ukraine-geo-data (ODbL). Мапа вулиць: OpenFreeMap / OpenMapTiles / © OpenStreetMap. Для вулиць потрібен інтернет. Позначки великих міст — орієнтовні. Деякі адміністративні записи можуть відрізнятися від поточного офіційного кодифікатора.</footer>
 </div>
 <nav class="mobile-dock" aria-label="Мобільна навігація"><a href="#home"><span>⌂</span>Головна</a><a href="#map"><span>▦</span>Мапа</a><a href="#story"><span>♡</span>Історія</a></nav>
 <div class="dialog-backdrop" id="dialog-layer" aria-hidden="true"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="dialog-head"><h2 id="modal-title">Демокартка</h2><button type="button" class="dialog-close" id="close-dialog" aria-label="Закрити">×</button></div>
