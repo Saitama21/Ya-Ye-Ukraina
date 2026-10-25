@@ -20,7 +20,9 @@ let map=null,regionLayer=null,highlight=null,focusLayer=null,cityLayer=null,tile
  mode="overview",current={kind:"country"},startPromise=null,libPromise=null,
  seq=0,boundaryAbort=null,loadedTile=false;
 const cache=new Map();
-const reducedMotion=()=>window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const touchSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+ (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const reducedMotion=()=>touchSafari||window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 function message(s){$("#map-status").textContent=s;$("#map-data-hint").textContent=s}
 function toggleUI(){
  const live=mode==="streets";
@@ -63,7 +65,7 @@ function boundsOf(obj){
 function flyBounds(b,z){
  if(!b||!map)return false;
  const pad=root.clientWidth<580?[18,18]:[36,36];
- const opts={padding:pad,maxZoom:z||14,animate:false};
+ const opts={padding:pad,maxZoom:z||14,animate:!reducedMotion(),duration:.95};
  map.fitBounds(b,opts);
  requestAnimationFrame(()=>map?.invalidateSize({pan:false}));
  return true;
@@ -100,7 +102,7 @@ function chooseCity(name,lat,lon){
  clearFocus();
  window.L.circleMarker([lat,lon],{radius:8,color:"#fff2bb",weight:2,fillColor:"#ffd452",fillOpacity:1})
    .bindTooltip(name,{direction:"top"}).addTo(cityLayer);
- map.setView([lat,lon],13.5,{animate:false});
+ map.flyTo([lat,lon],13.5,{duration:reducedMotion()?0:1.05});
  message("Місто "+name+" · вулиці та будинки");
 }
 function showRegion(s){
@@ -112,7 +114,7 @@ function showRegion(s){
   return true;
  }
  const center=cityCenters[s.oblast?.name];
- if(center){map.setView(center,12,{animate:false});return true}
+ if(center){map.flyTo(center,12,{duration:reducedMotion()?0:1.05});return true}
  return false;
 }
 async function navigate(s){
@@ -171,7 +173,7 @@ async function initialize(){
  const L=await library();
  if(!target.isConnected)throw Error("Map container missing");
  map=L.map(target,{zoomControl:false,attributionControl:true,scrollWheelZoom:true,preferCanvas:false,
-  worldCopyJump:false,minZoom:3,maxZoom:19,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false,
+  worldCopyJump:false,minZoom:3,maxZoom:19,zoomAnimation:!reducedMotion(),fadeAnimation:!reducedMotion(),markerZoomAnimation:!reducedMotion(),
   tap:false,renderer:L.svg({padding:.5})});
  map.setView([48.5,31.4],5);
  tiles=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
