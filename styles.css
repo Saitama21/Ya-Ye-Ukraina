@@ -8,3 +8,26 @@
 @media(max-width:800px){.workspace{grid-template-columns:1fr}.side{min-height:0}.tree{max-height:280px}.map-panel{min-height:500px}.map-wrap{min-height:360px}.map-wrap svg{min-height:360px}.info{grid-template-columns:1fr 1fr;grid-column:auto}.intro{padding-top:17px}.mini-counter{display:none}.topnav{display:none}.kpi-row{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:550px){.app-shell{padding:0 12px calc(120px + env(safe-area-inset-bottom))}.topbar{height:66px}.logo{font-size:22px}.intro h1{font-size:28px}.intro p{font-size:12px}.intro{padding:23px 3px 18px}.workspace{gap:11px}.side{padding:12px}.tree{max-height:250px}.map-panel{min-height:410px}.map-wrap{min-height:310px}.map-wrap svg{min-height:300px}.map-caption{font-size:10px}.map-toolbar{padding:12px}.city-name{font-size:17px}.info{display:flex}.info-hero{min-height:155px}.kpi{padding:15px}.kpi strong{font-size:24px}.mobile-dock{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:2px;width:87%;height:68px;z-index:19;background:#0c2846ec;backdrop-filter:blur(22px);border:1px solid #4b7298b8;border-radius:24px;justify-content:space-around;align-items:center;box-shadow:0 5px 35px #000a}.mobile-dock a{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:#d5e9fc}.mobile-dock a span{font-size:23px;line-height:1;color:var(--gold)}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
+
+/* ── Street map: standalone MapLibre layer; SVG overview stays intact for offline fallback. ── */
+.map-mode{display:flex;align-items:center;gap:4px;background:#071c31;border:1px solid #37608a;border-radius:11px;padding:4px;flex-shrink:0}
+.map-mode button{border:0;background:transparent;color:#b1cee6;border-radius:8px;padding:9px 13px;font-size:12px;font-weight:650;white-space:nowrap}
+.map-mode button.active{background:linear-gradient(155deg,#245f9b,#174071);color:white;box-shadow:inset 0 -2px #ffd452}
+.street-map{position:absolute;inset:0;z-index:1;width:100%;height:100%;min-height:320px;isolation:isolate;background:#061b30}
+.street-map[hidden]{display:none!important}
+.map-wrap.street-active #ukraine-map{visibility:hidden;pointer-events:none}
+.map-wrap.street-active .street-map{display:block}
+.map-wrap.street-active .zoom-controls{z-index:3}
+.maplibregl-map{font-family:inherit!important}
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{z-index:3}
+.maplibregl-ctrl-attrib{font-size:10px!important;background:rgba(7,23,40,.74)!important;color:#bfd5e9!important}
+.maplibregl-ctrl-attrib a{color:#96c8fa!important}
+.maplibregl-ctrl-attrib-button{filter:brightness(1.4)}
+.maplibregl-canvas:focus-visible{outline:2px solid #ffd452}
+@media(max-width:550px){
+  .map-mode button{padding:8px 9px;font-size:11px}
+  .map-toolbar{gap:6px}
+  .map-toolbar h2{font-size:13px}
+  .map-toolbar small{font-size:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .map-caption{flex-direction:column;align-items:flex-start}
+}
