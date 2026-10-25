@@ -76,18 +76,40 @@ function clearFocus(){
  if(highlight)highlight.clearLayers();
  if(cityLayer)cityLayer.clearLayers();
 }
-async function getFine(type,id,signal){
- const file=files[type]?.[id];if(!file)return null;
+// OSM datasets are *hierarchical*: oblast.geojson contains raion polygons,
+// raion.geojson contains hromada polygons, and hromada.geojson contains
+// individual settlements. Do not draw child polygons as the selected parent's outline.
+function canonicalName(value){
+ return String(value||"").toLocaleLowerCase("uk")
+   .replace(/\\s+(?:міська|селищна|сільська)\\s+громада$/u,"")
+   .replace(/\\s+район$/u,"")
+   .replace(/\\s+/g," ").trim();
+}
+async function readGeoFile(file,signal){
+ if(!file||!/^[a-z0-9_.-]+\\.geojson$/.test(file))return null;
  if(cache.has(file))return cache.get(file);
- const r=await fetch(GEOBASE+encodeURIComponent(file),{signal,mode:"cors"});
- if(!r.ok)throw Error("GeoJSON HTTP "+r.status);
- const json=await r.json();
- if(json.type!=="FeatureCollection"&&json.type!=="Feature")return null;
- const good=json.type==="FeatureCollection"?
- {type:"FeatureCollection",features:json.features.filter(x=>x.geometry&&["Polygon","MultiPolygon"].includes(x.geometry.type))}:json;
- if(good.type==="FeatureCollection"&&!good.features.length)return null;
- cache.set(file,good);if(cache.size>18)cache.delete(cache.keys().next().value);
- return good;
+ const response=await fetch(GEOBASE+encodeURIComponent(file),{signal,mode:"cors"});
+ if(!response.ok)throw Error("GeoJSON HTTP "+response.status);
+ const payload=await response.json();
+ if(payload.type!=="FeatureCollection"||!Array.isArray(payload.features))return null;
+ const features=payload.features.filter(f=>f&&f.properties&&
+   ["Polygon","MultiPolygon"].includes(f.geometry?.type));
+ cache.set(file,features);
+ if(cache.size>18)cache.delete(cache.keys().next().value);
+ return features;
+}
+async function getFine(type,selection,signal){
+ // A district is stored in its oblast file; a hromada is stored in its district file.
+ const districtFile=files.district?.[selection.raion?.id];
+ if(!districtFile)return null;
+ const file=type==="district"?districtFile.split(".")[0]+".geojson":districtFile;
+ const name=type==="district"?selection.raion?.name:selection.community?.name;
+ const features=await readGeoFile(file,signal);
+ if(!features||!name)return null;
+ const found=features.filter(f=>canonicalName(f.properties.name)===canonicalName(name));
+ // No approximation: an ambiguous or missing name is not a boundary.
+ if(found.length!==1){console.warn("Boundary not uniquely found:",file,name,found.length);return null}
+ return {type:"Feature",properties:{name:found[0].properties.name},geometry:found[0].geometry};
 }
 function selectedOutline(geo,color="#ffcf52"){
  if(!geo||!map)return null;
@@ -135,32 +157,35 @@ async function navigate(s){
    else message("Геометрію області не знайдено");
    return;
   }
-  // Show genuine parent boundary immediately; never guess a subregion's center.
-  showRegion(s);
-  const type=s.kind==="raion"?"district":"community";
-  const id=s.kind==="raion"?s.raion?.id:s.community?.id;
-  const parentId=s.raion?.id;
-  const exact=!!files[type]?.[id],parent=s.kind==="community"&&!!files.district?.[parentId];
-  if(!exact&&!parent){
-    message("Точні межі не знайдено. Показано батьківську область.");
+  // Do not show the oblast border while an exact lower-level contour is loading.
+  clearFocus();
+  if(!files.district?.[s.raion?.id]){
+    showRegion(s);
+    message("Перевіреної межі території немає. Показано батьківську область.");
     return;
   }
-  message("Завантажуємо точні межі території…");
+  message("Завантажуємо межу обраної території…");
   let geo=null,showingParent=false;
   try{
-   if(exact)geo=await getFine(type,id,boundaryAbort.signal);
+   geo=await getFine(s.kind==="raion"?"district":"community",s,boundaryAbort.signal);
    if(ticket!==seq||mode!=="streets")return;
-   if(!geo&&parent){geo=await getFine("district",parentId,boundaryAbort.signal);showingParent=true}
+   if(!geo&&s.kind==="community"){
+      geo=await getFine("district",s,boundaryAbort.signal);
+      showingParent=Boolean(geo);
+   }
   }catch(e){
    if(e.name==="AbortError"||ticket!==seq)return;
    console.warn("Boundary unavailable",e);
   }
   if(ticket!==seq||mode!=="streets")return;
-  if(!geo){message("Детальну межу не завантажено. Показано область.");return}
-  clearFocus();
+  if(!geo){
+    showRegion(s);
+    message("Точну межу не знайдено. Показано область, без вигаданих контурів.");
+    return;
+  }
   const b=selectedOutline(geo);
-  flyBounds(b,s.kind==="community"&&!showingParent?14:12);
-  message(showingParent?"Контур громади відсутній: показано її район. Вулиці можна наближати вручну.":"Межа "+(s.kind==="raion"?"району":"громади")+" · вулиці, дороги й населені пункти");
+  flyBounds(b,showingParent?12:(s.kind==="community"?14:12));
+  message(showingParent?"Межі громади немає — показано справжню межу району.":s.kind==="raion"?"Жовтим позначена межа обраного району.":"Жовтим позначена межа всієї громади (не лише її центрального селища).");
  }catch(e){
   if(ticket!==seq)return;
   console.warn("Live map navigation error",e);
