@@ -174,7 +174,9 @@ async function show(card){
    const m=await streetMap({kind:"country"},false);
    if(ticket!==operation)return false;
    renderPreview(card);
-   m.setView([card.lat,card.lng],17,{animate:!window.matchMedia("(prefers-reduced-motion: reduce)").matches});
+   const touchSafari=/iPad|iPhone|iPod/.test(navigator.userAgent)||
+   (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+   m.setView([card.lat,card.lng],17,{animate:!touchSafari&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches});
    document.getElementById("map").scrollIntoView({behavior:"smooth",block:"start"});
    setTimeout(drawSoon,220);
    return true;
