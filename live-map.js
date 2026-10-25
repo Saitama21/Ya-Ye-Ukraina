@@ -33,6 +33,7 @@ function toggleUI(){
  target.hidden=!live;
  window.YE_STREET_ACTIVE=live;
  if(live&&map)requestAnimationFrame(()=>map.invalidateSize({pan:false}));
+ if(!live)$("#retry-tiles").hidden=true;
 }
 async function loadScript(url,timeoutMs){
  return new Promise((resolve,reject)=>{
@@ -181,9 +182,30 @@ async function initialize(){
   maxZoom:19,maxNativeZoom:19,minZoom:3,updateWhenIdle:true,updateWhenZooming:false,keepBuffer:1,
   crossOrigin:false
  }).addTo(map);
- let tileErrors=0;
- tiles.on("tileload",()=>{loadedTile=true});
- tiles.on("tileerror",()=>{tileErrors++;if(!loadedTile&&tileErrors>4){message("Підкладка вулиць не завантажилась. Перевір мережу або онови сторінку.");}});
+ // Real tile events, not fake progress. Never auto-retry a blocked public tile server.
+ const retry=$("#retry-tiles");
+ let inFlight=0,tileErrors=0,watchdog=null;
+ const updateHealth=()=>{
+   if(mode!=="streets"){retry.hidden=true;return}
+   if(tileErrors>=3||inFlight>=5){
+     retry.hidden=false;
+     message("Частина плиток не завантажилась. Перевір мережу та натисни «Оновити плитки».");
+   }else if(inFlight===0){retry.hidden=true}
+ };
+ const startWatch=()=>{
+   if(watchdog)clearTimeout(watchdog);
+   watchdog=setTimeout(updateHealth,10000);
+ };
+ tiles.on("tileloadstart",()=>{inFlight++;startWatch()});
+ tiles.on("tileload",()=>{loadedTile=true;inFlight=Math.max(0,inFlight-1);if(inFlight===0&&tileErrors===0){retry.hidden=true;if(watchdog)clearTimeout(watchdog)}});
+ tiles.on("tileerror",()=>{tileErrors++;inFlight=Math.max(0,inFlight-1);if(tileErrors>=3)updateHealth()});
+ tiles.on("tileabort",()=>{inFlight=Math.max(0,inFlight-1)});
+ retry.onclick=()=>{
+   if(mode!=="streets")return;
+   tileErrors=0;inFlight=0;retry.hidden=true;
+   message("Повторно завантажуємо відсутні плитки…");
+   tiles.redraw();map.invalidateSize({pan:false});
+ };
  regionLayer=L.geoJSON(regionJSON,{
   style:{color:"#3997e8",weight:1.0,opacity:.86,fillColor:"#0b67bb",fillOpacity:.04},
   onEachFeature(feature,layer){
