@@ -14,6 +14,14 @@ const pathOf=o=>o.polys.map(poly=>poly.map(ring=>ring.map((p,i)=>(i?"L":"M")+p[0
 const regionPaths=new Map(),canvas=$("#ukraine-map"),regionLayer=$("#region-layer"),cityLayer=$("#city-layer");
 let selection={kind:"country"},openedArea=null,openedDistrict=null,areaMode="oblast",tab="map",view=[0,0,900,600],cards=[];
 try{const s=JSON.parse(localStorage.getItem("ye-ukraina-cards-v3")||"[]");if(Array.isArray(s))cards=s.filter(x=>x&&typeof x.name==="string").slice(0,500)}catch(e){}
+window.YE_GET_CARDS=()=>cards;
+function saveCards(next){
+ try{localStorage.setItem("ye-ukraina-cards-v3",JSON.stringify(next))}
+ catch(e){alert("Не вдалося зберегти в цьому браузері.");return false}
+ cards=next;renderTree();renderInfo();renderStats();
+ window.dispatchEvent(new CustomEvent("ye:cards-updated"));
+ return true;
+}
 function button(label,cls,fn,right,icon){
  const b=n("button",cls),i=n("span","",icon||"›"),txt=n("span","label",label);
  b.type="button";b.append(i,txt);if(right!==undefined)b.append(n("small","",String(right)));
@@ -196,33 +204,115 @@ $("#reset-selection").onclick=()=>{openedArea=null;openedDistrict=null;$("#place
 $("#zoom-in").onclick=()=>{if(window.YE_LIVE_MAP?.zoomIn())return;zoom(view[0]+view[2]/2,view[1]+view[3]/2,view[2]*.78,view[3]*.78)};
 $("#zoom-out").onclick=()=>{if(window.YE_LIVE_MAP?.zoomOut())return;zoom(view[0]+view[2]/2,view[1]+view[3]/2,view[2]*1.3,view[3]*1.3)};
 $("#zoom-home").onclick=()=>{if(window.YE_LIVE_MAP?.zoomHome())return;zoomSelection()};
-function modal(open){$("#dialog-layer").classList.toggle("open",open);$("#dialog-layer").setAttribute("aria-hidden",String(!open))}
-let activeCard=null;
-function showCard(c){
- activeCard=c;$("#card-form").hidden=true;$("#card-view").hidden=false;$("#modal-title").textContent="Моя демокартка";
- $("#view-name").textContent=c.name;$("#view-number").textContent="№ "+c.id;$("#view-place").textContent=c.place;
- $("#view-message").textContent=c.message||"Я — частина України 💙💛";$("#share-card").textContent="Поділитися текстом";
+function modal(open){
+ $("#dialog-layer").classList.toggle("open",open);
+ $("#dialog-layer").setAttribute("aria-hidden",String(!open));
+}
+let activeCard=null,pendingPoint=null,pendingScope=null;
+const hasPoint=c=>Boolean(window.YE_PIXELS?.getPoint(c));
+function cardSelection(c){
+ const o=areas.find(a=>a.id===c.region);
+ if(!o){
+  const found=cities.find(x=>x[0]===c.place);
+  return found?{kind:"city",city:{name:found[0],lat:found[1],lon:found[2]}}:{kind:"country"};
+ }
+ const r=o.raions.find(r=>r.id===c.raion),h=r?.hromadas.find(h=>h.id===c.community);
+ if(h)return {kind:"community",oblast:o,raion:r,community:h};
+ if(r)return {kind:"raion",oblast:o,raion:r};
+ return {kind:"oblast",oblast:o};
+}
+function openCardDetails(c){
+ activeCard=c;$("#card-form").hidden=true;$("#card-view").hidden=false;
+ $("#modal-title").textContent="Моя демокартка";
+ $("#view-name").textContent=c.name;$("#view-number").textContent="№ "+c.id;
+ $("#view-place").textContent=c.place;
+ $("#view-message").textContent=c.message||"Я — частина України 💙💛";
+ $("#view-pixel-meta").textContent=hasPoint(c)?"▦ "+c.cellId+" · символічне місце":"▦ Місце на мапі ще не вибране";
+ $("#view-map").textContent=hasPoint(c)?"▦ Показати піксель на мапі":"⌖ Прив’язати місце на мапі";
+ $("#share-card").textContent="Поділитися текстом";
  modal(true);
 }
-function createCard(){
- activeCard=null;$("#card-form").reset();$("#card-form").hidden=false;$("#card-view").hidden=true;
- $("#modal-title").textContent="Створити демокартку";$("#dialog-place").textContent=stack().join(" › ");
- modal(true);$("#card-name").focus();
+function showCard(c){
+ if(hasPoint(c)){
+  modal(false);
+  void window.YE_PIXELS.show(c);
+ }else openCardDetails(c);
 }
-$("#create-demo").onclick=createCard;
+window.YE_OPEN_CARD_BY_ID=id=>{
+ const c=cards.find(x=>String(x.id)===String(id));
+ if(c)openCardDetails(c);
+};
+async function pickExisting(c){
+ modal(false);
+ const ready=await window.YE_PIXELS?.beginPick({
+   selection:cardSelection(c),exceptId:c.id,
+   onSelected(cell){
+     const updated={...c,...cell,gridSize:90};
+     const next=cards.map(v=>v.id===c.id?updated:v);
+     if(!saveCards(next))return;
+     void window.YE_PIXELS.show(updated);
+   }
+ });
+ return Boolean(ready);
+}
+async function createCard(){
+ if(!window.YE_PIXELS){
+  alert("Піксельна мапа ще завантажується. Онови сторінку.");return;
+ }
+ pendingPoint=null;
+ const scope=selection,pname=place();
+ modal(false);
+ await window.YE_PIXELS.beginPick({
+   selection:scope,
+   onSelected(cell){
+     pendingPoint=cell;
+     pendingScope={geo:scope,name:pname};
+     activeCard=null;$("#card-form").reset();
+     $("#card-form").hidden=false;$("#card-view").hidden=true;
+     $("#modal-title").textContent="Мій піксель на мапі";
+     $("#dialog-place").textContent=pname;
+     $("#pixel-choice-info").textContent="▦ "+cell.cellId+" · 90 × 90 м · безкоштовне демо";
+     modal(true);$("#card-name").focus();
+   }
+ });
+}
+$("#create-demo").onclick=()=>void createCard();
+$("#view-map").onclick=()=>{
+ if(!activeCard)return;
+ if(hasPoint(activeCard)){
+   modal(false);void window.YE_PIXELS.show(activeCard);
+ }else void pickExisting(activeCard);
+};
 $("#close-dialog").onclick=()=>modal(false);
 $("#dialog-layer").onclick=e=>{if(e.target===$("#dialog-layer"))modal(false)};
 document.addEventListener("keydown",e=>{if(e.key==="Escape")modal(false)});
 $("#card-form").onsubmit=e=>{
- e.preventDefault();const name=$("#card-name").value.trim();if(!name)return;
- const card={id:Date.now().toString(36).toUpperCase(),name:name.slice(0,45),message:$("#card-message").value.trim().slice(0,140),place:place(),region:selection.oblast?.id||null,raion:selection.raion?.id||null,community:selection.community?.id||null,created:new Date().toISOString()};
- const next=[...cards,card];
- try{localStorage.setItem("ye-ukraina-cards-v3",JSON.stringify(next))}catch{alert("Помилка локального збереження");return}
- cards=next;renderTree();renderInfo();renderStats();showCard(card);
+ e.preventDefault();
+ if(!pendingPoint||!pendingScope){alert("Спочатку обери точну клітинку на мапі.");return}
+ const name=$("#card-name").value.trim();if(!name)return;
+ if(window.YE_PIXELS.occupied(pendingPoint.cellId)){
+   alert("Ця клітинка вже має локальну картку. Обери іншу.");return;
+ }
+ const loc=pendingScope.geo;
+ const card={
+   id:Date.now().toString(36).toUpperCase(),name:name.slice(0,45),
+   message:$("#card-message").value.trim().slice(0,140),
+   place:pendingScope.name,
+   region:loc.oblast?.id||null,raion:loc.raion?.id||null,
+   community:loc.community?.id||null,
+   created:new Date().toISOString(),
+   ...pendingPoint,gridSize:90
+ };
+ if(!saveCards([...cards,card]))return;
+ pendingPoint=null;pendingScope=null;modal(false);
+ void window.YE_PIXELS.show(card);
 };
 $("#share-card").onclick=async()=>{
  if(!activeCard)return;
- const txt="Я Є. Україна 🇺🇦\n"+activeCard.name+"\n"+activeCard.place+"\n"+(activeCard.message||"")+"\nЛокальна демокартка, не покупка.";
+ const c=activeCard;
+ const txt="Я Є. Україна 🇺🇦\n"+c.name+"\n"+c.place+"\n"+(c.message||"")+
+ (hasPoint(c)?"\nПіксель: "+c.cellId:"")+
+ "\nЛокальна демокартка, не покупка.";
  try{
  if(navigator.share)await navigator.share({text:txt});
  else if(navigator.clipboard)await navigator.clipboard.writeText(txt);
@@ -232,9 +322,9 @@ $("#share-card").onclick=async()=>{
 };
 $("#delete-card").onclick=()=>{
  if(!activeCard||!confirm("Видалити цю локальну картку?"))return;
- cards=cards.filter(c=>c.id!==activeCard.id);
- try{localStorage.setItem("ye-ukraina-cards-v3",JSON.stringify(cards))}catch{}
- modal(false);renderTree();renderInfo();renderStats();
+ if(!saveCards(cards.filter(c=>c.id!==activeCard.id)))return;
+ window.YE_PIXELS?.renderPreview(null);
+ modal(false);
 };
 $("#jump-map").onclick=()=>$("#map").scrollIntoView({behavior:"smooth"});
 choose({kind:"country"});
