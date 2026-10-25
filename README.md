@@ -1,6 +1,6 @@
 # Я Є. Україна 🇺🇦
 
-**Dark Ukraine Hybrid — nationwide map prototype (v0.5.3 — correct raion/hromada boundaries).**
+**Dark Ukraine Hybrid — nationwide map prototype (v0.6 — local pixel-linked cards).**
 
 A responsive, self-hosted, offline-capable-after-loading static web demo of Ukraine's administrative hierarchy. No backend, payment processing or fictitious public-user counts. Street-mode resources are loaded from third-party CDNs and require internet.
 
@@ -72,3 +72,18 @@ This addresses plausible rendering/network causes of missing tiles. JavaScript s
 Earlier builds mistakenly showed *all settlement polygons* from `<oblast>.<district>.<hromada>.geojson` when the selected item was a **hromada**, and all community polygons when selecting a **district**. Those are child features, not the selected administrative perimeter.
 
 Now the implementation selects **exactly one matching OSM relation polygon** from the file of the parent level. For example, the selection `Калинівська громада` resolves to `Калинівська селищна громада` (OSM relation 12545509) inside `kyyivska_oblast.fastivskyy_rayon.geojson`; and `Фастівський район` resolves from `kyyivska_oblast.geojson`. If boundaries cannot be matched unambiguously, the UI falls back to a verified parent contour with explicit messaging. The hromada polygon can encompass multiple constituent villages; it should not be confused with the outline of its namesake settlement.
+
+## Pixel places — v0.6 (prototype)
+
+- After selecting an oblast, raion, hromada or city, **Створити демокартку** now opens the real street map in a point-picking mode. The first tap while far away zooms closer; tap again at zoom 16+ to select a deterministic square pixel.
+- The grid is **90 × 90 metres** in Web Mercator (EPSG:3857). Its immutable key is `UA90-{gridX}-{gridY}`. The card persists both `cellId` and the coordinates of the cell centre (`lat`, `lng`, `cx`, `cy`, `gridSize`). The same cell yields the same ID regardless of browser zoom.
+- Occupied cells from **this browser only** appear golden; the currently selected card receives brighter pixel highlighting. At street zoom ≥16, a square grid appears on a canvas on top of Leaflet without hijacking touch gestures.
+- Selecting a pixel-bound card from **Мої** now takes you directly to its cell at zoom 17 and opens a floating card preview with **Картка** (details, sharing and deletion).
+- Older cards without coordinates are preserved under the same localStorage key. They open **Прив’язати місце на мапі** rather than fabricating a position. Binding does not replace the card ID, name, text, or date.
+- New cards can only be created after selecting a location. No default/example coordinates, automatic GPS access or silent geolocation.
+- All data remains entirely local. **There is no global cell reservation, no authentication, payment, or public placement.** Two independent devices may choose the same cell; preventing that in production requires transactional server allocation and payment-confirmed ownership.
+- Clicking **Пікселі** toggles the Canvas overlay. Live map tiles and point picking need an online map connection; the independent SVG overview remains available as a fallback.
+
+### Privacy
+
+Precise cell coordinates are stored on the user's own device. Sharing the card's pixel ID is voluntary and can disclose the selected approximate location, so the production product must offer visibility/privacy controls before exposing user positions publicly.
