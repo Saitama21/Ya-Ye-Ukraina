@@ -31,3 +31,13 @@
   .map-toolbar small{font-size:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .map-caption{flex-direction:column;align-items:flex-start}
 }
+
+/* Live raster map — Leaflet does not depend on WebGL. */
+.street-map.leaflet-container{height:100%;width:100%;background:#071729;font-family:inherit}
+.street-map .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.79) contrast(1.12) saturate(.78)}
+.street-map .leaflet-control-attribution{font-family:inherit;font-size:10px;background:rgba(7,22,40,.87)!important;color:#bbd3e9!important}
+.street-map .leaflet-control-attribution a{color:#81bcff!important}
+.street-map .leaflet-tooltip{border:1px solid #3972aa;background:#091e35;color:#eaf5ff;border-radius:8px;font-size:12px;font-weight:600;box-shadow:0 5px 15px #0008;padding:6px 9px}
+.street-map .leaflet-tooltip:before{display:none}
+.street-map .leaflet-interactive:focus{outline:2px solid #ffd452;outline-offset:2px}
+.map-wrap.street-active{background:#081a2f}
